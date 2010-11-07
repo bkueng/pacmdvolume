@@ -42,6 +42,9 @@ private:
 	void wrongUsage(const char* fmt, ...);
 	void printVersion();
 	
+	//parse a comma-separated int list
+	void parseIntList(const string& str, vector<int>& v);
+	
 	void processArgs();
 	
 	

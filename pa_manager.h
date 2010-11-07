@@ -19,6 +19,10 @@
 #include <map>
 #include <pulse/pulseaudio.h>
 
+
+#define MAX_VOLUME PA_VOLUME_NORM //which is 0dB or use PA_VOLUME_MAX
+
+
 enum EPADeviceType {
 	PADev_sink,
 	PADev_source
@@ -71,9 +75,9 @@ public:
 	void DeInit();
 	
 	const pa_dev_list& Sinks() const { return(m_sinks); }
-	const PADeviceInfo* Sink(uint32_t idx); /* returns NULL if not found */
+	PADeviceInfo* Sink(uint32_t idx); /* returns NULL if not found */
 	const pa_dev_list& Sources() const { return(m_sources); }
-	const PADeviceInfo* Source(uint32_t idx); /* returns NULL if not found */
+	PADeviceInfo* Source(uint32_t idx); /* returns NULL if not found */
 	
 	
 	/* find a sink/source where name is a substring of the card name. the first found will be returned
@@ -81,9 +85,22 @@ public:
 	uint32_t getSink(const string& name); 
 	uint32_t getSource(const string& name);
 	
+	/* volume */
+	
+	/* volume has the format: 
+	 * absolute value or with %
+	 * + or - for in/decrease
+	 * * or / for logarithmical in/decrease
+	 */
+	void setSinkVolume(uint32_t idx, const string& volume, const vector<int>* channel_list=NULL);
+	 
+	void setSinkVolume(uint32_t idx, const pa_cvolume& volume);
+	
 private:
 	
 	void InitDevices();
+	
+	void applyVolume(const string& volume, pa_volume_t& value);
 	
 	pa_dev_list m_sinks;
 	pa_dev_list m_sources;

@@ -139,6 +139,14 @@ void pa_sourcelist_cb(pa_context *c, const pa_source_info *l, int eol, void *use
 	(*pa_device_list)[l->index]=device;
 }
 
+//volume change callback
+void pa_volume_change_cb(pa_context* c, int success, void *userdata) {
+	
+	int* ready=(int*)userdata;
+	if(success==1) *ready=1;
+	else *ready=-1;
+}
+
 
 
 
@@ -277,13 +285,13 @@ void PAManager::InitDevices() {
 }
 
 
-const PADeviceInfo* PAManager::Sink(uint32_t idx) {
+PADeviceInfo* PAManager::Sink(uint32_t idx) {
 	pa_dev_list::iterator iter = m_sinks.find(idx);
 	if(iter==m_sinks.end()) return(NULL);
 	return(iter->second);
 }
 
-const PADeviceInfo* PAManager::Source(uint32_t idx) {
+PADeviceInfo* PAManager::Source(uint32_t idx) {
 	pa_dev_list::iterator iter = m_sources.find(idx);
 	if(iter==m_sources.end()) return(NULL);
 	return(iter->second);
@@ -304,6 +312,100 @@ uint32_t PAManager::getSource(const string& name) {
 	return((uint32_t)-1);
 }
 
+
+void PAManager::setSinkVolume(uint32_t idx, const pa_cvolume& volume) {
+	
+	pa_operation* o;
+	m_pa_ready=0;
+	
+	if(!(o = pa_context_set_sink_volume_by_index(m_pa_context, idx, &volume, pa_volume_change_cb, &m_pa_ready))) {
+		LOG(ERROR, "pa_context_set_sink_volume_by_index() for index %i failed", idx);
+	} else {
+		pa_operation_unref(o);
+	}
+	
+	while(m_pa_ready==0) {
+		//wait for the callback
+		pa_mainloop_iterate(m_pa_mainloop, 1, NULL);
+	}
+	
+}
+
+
+void PAManager::setSinkVolume(uint32_t idx, const string& volume, const vector<int>* channel_list) {
+	PADeviceInfo* sink=Sink(idx);
+	ASSERT_THROW_e(sink, EINVALID_PARAMETER, "sink with idx %i not found", idx);
+	ASSERT_THROW(volume.length()>0, EINVALID_PARAMETER);
+	
+	pa_cvolume& vol=sink->volume;
+	
+	if(channel_list && channel_list->size()>0) {
+		for(size_t i=0; i<channel_list->size(); ++i) {
+			if((*channel_list)[i]>=0 && (*channel_list)[i]<vol.channels) {
+				applyVolume(volume, vol.values[(*channel_list)[i]]);
+			} else {
+				LOG(ERROR, "sink %i does not have a channel with index %i", idx, (*channel_list)[i]);
+			}
+		}
+	} else { //all channels
+		for(uint8_t i=0; i<vol.channels; ++i) {
+			applyVolume(volume, vol.values[i]);
+		}
+	}
+	setSinkVolume(idx, vol);
+	
+}
+
+void PAManager::applyVolume(const string& volume, pa_volume_t& value) {
+	string vol=trim(volume);
+	ASSERT_THROW_e(vol.length()>0, EINVALID_PARAMETER, "invalid volume format");
+	bool bPercentage=false;
+	if(vol[vol.length()-1]=='%') {
+		bPercentage=true;
+		vol=vol.substr(0, vol.length()-1);
+		ASSERT_THROW_e(vol.length()>0, EINVALID_PARAMETER, "invalid volume format");
+	}
+	float fchange;
+	
+	if(sscanf(vol.c_str(), "+%f", &fchange)==1) {
+		if(bPercentage) {
+			value=min(MAX_VOLUME, (pa_volume_t)((float)value+(float)MAX_VOLUME*fchange/100.0));
+		} else {
+			value=min(MAX_VOLUME, value+(pa_volume_t)fchange);
+		}
+	} else if(sscanf(vol.c_str(), "-%f", &fchange)==1) {
+		if(bPercentage) {
+			value=(pa_volume_t)max(0.0, ((float)value-(float)MAX_VOLUME*fchange/100.0));
+		} else {
+			if((pa_volume_t)fchange >= value) value=0;
+			else value=value-(pa_volume_t)fchange;
+		}
+	} else if(sscanf(vol.c_str(), "*%f", &fchange)==1) {
+		if(value==0) value=10;
+		if(bPercentage) {
+			value=min(MAX_VOLUME, (pa_volume_t)((float)value*fchange/100.0));
+		} else {
+			value=min(MAX_VOLUME, (pa_volume_t)((float)value*fchange));
+		}
+	} else if(sscanf(vol.c_str(), "/%f", &fchange)==1) {
+		if(value==0) value=10;
+		if(fchange==0.0) fchange=1.0;
+		if(bPercentage) {
+			value=min(MAX_VOLUME, (pa_volume_t)((float)value/fchange*100.0));
+		} else {
+			value=min(MAX_VOLUME, (pa_volume_t)((float)value/fchange));
+		}
+	} else if(sscanf(vol.c_str(), "%f", &fchange)==1) {
+		if(bPercentage) {
+			value=min(MAX_VOLUME, ((pa_volume_t)fchange*MAX_VOLUME)/100);
+		} else {
+			value=min(MAX_VOLUME, (pa_volume_t)fchange);
+		}
+	} else {
+		THROW_s(EINVALID_PARAMETER, "volume format %s not recogniced", volume.c_str());
+	}
+	
+}
 
 
 

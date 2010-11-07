@@ -57,6 +57,9 @@ void CMain::parseCommandLine(int argc, char *argv[]) {
 	m_parameters->addTask("list-sink", ' ');
 	m_parameters->addTask("list-source", ' ');
 	
+	m_parameters->addParam("set-volume", 's');
+	m_parameters->addParam("channels", 'n');
+	
 	
 	m_cl_parse_result=m_parameters->parse();
 	
@@ -64,12 +67,23 @@ void CMain::parseCommandLine(int argc, char *argv[]) {
 
 void CMain::printHelp() {
 	printf("Usage:\n"
-		" "APP_NAME" [-v] [-c or -C] -l\n"
+		" "APP_NAME" [-v] [-c or -C] --list\n"
+		" "APP_NAME" [-v] [-c or -C] --set-volume <volume> [-n <channels>]\n"
 		" "APP_NAME" --version\n"
 		"\n"
 		"  -l, --list                      list all sinks and sources\n"
 		"      --list-sink                 list sinks only\n"
 		"      --list-source               list sources only\n"
+		"\n"
+		"  -s, --set-volume <volume>       set sink volume\n"
+		"                                  <volume> format:\n"
+		"                                  absolute or with %%\n"
+		"                                  + or - for increase/decrease\n"
+		"                                  * or / for logarithmical increase/decrease\n"
+		"                                  example: -s *10%%\n"
+		"     -n, --channels <channels>    specify channels\n"
+		"                                  (comma-separated list with channel indexes)\n"
+		
 		"\n"
 		"  -c, --card <idx>                specify card index\n"
 		"  -C, --card-name <name>          specify card name\n"
@@ -210,9 +224,38 @@ void CMain::processArgs() {
 	}
 	
 	
+	/* parse channels */
+	vector<int> channels;
+	string channel_str;
+	if(m_parameters->getParam("channels", channel_str)) parseIntList(channel_str, channels);
+	
+	
 	/* change volume */
 	
+	string vol_change;
+	if(m_parameters->getParam("set-volume", vol_change)) {
+		
+		/* change sink volume */
+		if(sink_card_idx==(uint32_t)-2) {
+			THROW_s(EINVALID_PARAMETER, "specified sink not found");
+		} else if(sink_card_idx==(uint32_t)-1) {
+			for(pa_dev_list::const_iterator iter=m_pa_manager.Sinks().begin(); iter!=m_pa_manager.Sinks().end(); ++iter) {
+				m_pa_manager.setSinkVolume(iter->first, vol_change, &channels);
+			}
+		} else {
+			m_pa_manager.setSinkVolume(sink_card_idx, vol_change, &channels);
+		}
+	}
 	
+}
+
+void CMain::parseIntList(const string& str, vector<int>& v) {
+	string s=str+",";
+	int val;
+	while(s.length()>0) {
+		if(sscanf(s.c_str(), "%i", &val)==1) v.push_back(val);
+		s=s.substr(s.find(',')+1);
+	}
 }
 
 
