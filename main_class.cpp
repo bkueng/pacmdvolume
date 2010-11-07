@@ -50,10 +50,12 @@ void CMain::parseCommandLine(int argc, char *argv[]) {
 	m_parameters->addSwitch("version");
 	m_parameters->addSwitch("verbose", 'v');
 	
+	m_parameters->addParam("card", 'c');
+	m_parameters->addParam("card-name", 'C');
 	
-	//m_parameters->addTask("main task", 't');
-	//m_parameters->addParam("output", 'o', "", "main task");
-	//m_parameters->addSwitch("new-only", 'n', "main task");
+	m_parameters->addTask("list", 'l');
+	m_parameters->addTask("list-sink", ' ');
+	m_parameters->addTask("list-source", ' ');
 	
 	
 	m_cl_parse_result=m_parameters->parse();
@@ -62,8 +64,18 @@ void CMain::parseCommandLine(int argc, char *argv[]) {
 
 void CMain::printHelp() {
 	printf("Usage:\n"
-		" "APP_NAME" [-v] \n"
+		" "APP_NAME" [-v] [-c or -C] -l\n"
 		" "APP_NAME" --version\n"
+		"\n"
+		"  -l, --list                      list all sinks and sources\n"
+		"      --list-sink                 list sinks only\n"
+		"      --list-source               list sources only\n"
+		"\n"
+		"  -c, --card <idx>                specify card index\n"
+		"  -C, --card-name <name>          specify card name\n"
+		"                                  (can also be a substring of the name\n"
+		"                                  the first that is found will be used)\n"
+		"\n"
 		"  -v, --verbose                   print debug messages\n"
 		"  -h, --help                      print this message\n"
 		"  --version                       print the version\n"
@@ -118,17 +130,88 @@ void CMain::processArgs() {
 	
 	if(m_parameters->getSwitch("verbose")) CLog::getInstance().setConsoleLevel(DEBUG);
 	
+	/* connect to pulseaudio */
+	m_pa_manager.Init();
 	
-	string device;
-	if(m_parameters->getParam("device", device)) {
-		//device set
+	/* get card */
+	uint32_t sink_card_idx=-1; //-2 means a card is not found
+	uint32_t source_card_idx=-1;
+	
+	string card_val;
+	if(m_parameters->getParam("card", card_val)) {
+		int card_idx;
+		if(sscanf(card_val.c_str(), "%i", &card_idx)==1) {
+			if(m_pa_manager.Sink(card_idx)) {
+				sink_card_idx=card_idx;
+			} else {
+				sink_card_idx=-2;
+				LOG(DEBUG, "sink with card idx %i not found", card_idx);
+			}
+			if(m_pa_manager.Source(card_idx)) {
+				source_card_idx=card_idx;
+			} else {
+				source_card_idx=-2;
+				LOG(DEBUG, "source with card idx %i not found", card_idx);
+			}
+		} else {
+			THROW_s(EINVALID_PARAMETER, "Failed to parse card idx %s", card_val.c_str());
+		}
+	} else if(m_parameters->getParam("card-name", card_val)) {
+		if((sink_card_idx=m_pa_manager.getSink(card_val)) == (uint32_t)-1) {
+			sink_card_idx=-2;
+			LOG(DEBUG, "sink with name %s not found", card_val.c_str());
+		}
+		if((source_card_idx=m_pa_manager.getSource(card_val)) == (uint32_t)-1) {
+			source_card_idx=-2;
+			LOG(DEBUG, "source with name %s not found", card_val.c_str());
+		}
+	}
+	
+	
+	/* list devices */
+	bool bPrint_sinks=false;
+	bool bPrint_sources=false;
+	
+	if(m_parameters->setTask("list")->bGiven) {
+		bPrint_sinks=bPrint_sources=true;
 	} else {
-		//device is default value
+		if(m_parameters->setTask("list-sink")->bGiven) {
+			bPrint_sinks=true;
+		}
+		if(m_parameters->setTask("list-source")->bGiven) {
+			bPrint_sources=true;
+		}
 	}
 	
-	if(m_parameters->setTask("main task")->bGiven) {
-		
+	if(bPrint_sources && bPrint_sinks) cout << "sinks:" << endl << endl;
+	if(bPrint_sinks) {
+		if(sink_card_idx==(uint32_t)-2) {
+			THROW_s(EINVALID_PARAMETER, "specified sink not found");
+		} else if(sink_card_idx==(uint32_t)-1) {
+			for(pa_dev_list::const_iterator iter=m_pa_manager.Sinks().begin(); iter!=m_pa_manager.Sinks().end(); ++iter) {
+				cout << iter->second->Info() << endl << endl;
+			}
+		} else {
+			cout << m_pa_manager.Sink(sink_card_idx)->Info() << endl << endl;
+		}
 	}
+	
+	if(bPrint_sources && bPrint_sinks) cout << "sources:" << endl << endl;
+	if(bPrint_sources) {
+		if(source_card_idx==(uint32_t)-2) {
+			THROW_s(EINVALID_PARAMETER, "specified source not found");
+		} else if(source_card_idx==(uint32_t)-1) {
+			for(pa_dev_list::const_iterator iter=m_pa_manager.Sources().begin(); iter!=m_pa_manager.Sources().end(); ++iter) {
+				cout << iter->second->Info() << endl << endl;
+			}
+		} else {
+			cout << m_pa_manager.Source(source_card_idx)->Info() << endl << endl;
+		}
+	}
+	
+	
+	/* change volume */
+	
 	
 }
 

@@ -17,6 +17,7 @@
 
 #include "global.h"
 #include "command_line.h"
+#include "pa_manager.h"
 
 
 /*////////////////////////////////////////////////////////////////////////////////////////////////
@@ -46,6 +47,8 @@ private:
 	
 	CCommandLineParser* m_parameters;
 	ECLParsingResult m_cl_parse_result;
+	
+	PAManager m_pa_manager;
 };
 
 

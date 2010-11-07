@@ -1,0 +1,13 @@
+
+*~
+*.o
+*.ko
+*.a
+
+/build*
+/.config
+
+*.log
+
+/pacmdvolume
+

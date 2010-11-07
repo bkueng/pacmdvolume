@@ -97,4 +97,12 @@ string& replace(string& str, const string& find, const string& replace) {
 	return(str);
 }
 
+string roundStr(float val, int digits) {
+	char buffer[50];
+	char buffer2[50];
+	sprintf(buffer, "%%.%if", digits);
+	sprintf(buffer2, buffer, val);
+	return(string(buffer2));
+}
+
 

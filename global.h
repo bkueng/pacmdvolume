@@ -51,6 +51,7 @@ string trim(const string& str);
 
 string& replace(string& str, const string& find, const string& replace);
 
+string roundStr(float val, int digits);
 
 
 #endif /* GLOBAL_H_ */
