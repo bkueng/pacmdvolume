@@ -20,7 +20,7 @@
 #include <pulse/pulseaudio.h>
 
 
-#define MAX_VOLUME PA_VOLUME_NORM //which is 0dB or use PA_VOLUME_MAX
+#define MAX_VOLUME PA_VOLUME_NORM //which is 0dB
 
 
 enum EPADeviceType {
@@ -59,12 +59,45 @@ struct PADeviceInfo {
     EPADeviceType dev_type;
 };
 
+struct PAClientInfo {
+	PAClientInfo(const pa_client_info& info);
+
+	uint32_t index;
+	const string name;
+	uint32_t owner_module;
+	const string driver;
+};
+
+struct PASinkInputInfo {
+	PASinkInputInfo(const pa_sink_input_info& info);
+	
+	string Info() const;
+	
+	uint32_t index;
+	const string name;
+	uint32_t owner_module;
+	uint32_t client;
+	uint32_t sink;
+	pa_sample_spec sample_spec;
+	pa_channel_map channel_map;
+	pa_cvolume volume;
+	pa_usec_t buffer_usec;
+	pa_usec_t sink_usec;
+	const string driver;
+	int mute;
+	
+	PADeviceInfo* sink_obj;
+	PAClientInfo* client_obj;
+};
+
 /*////////////////////////////////////////////////////////////////////////////////////////////////
  ** class PAManager
  * connects to pulseaudio, retrieves info and changes values
 /*////////////////////////////////////////////////////////////////////////////////////////////////
 
 typedef map<uint32_t, PADeviceInfo*> pa_dev_list;
+typedef map<uint32_t, PAClientInfo*> pa_client_list;
+typedef map<uint32_t, PASinkInputInfo*> pa_sink_input_list;
 
 class PAManager {
 public:
@@ -79,11 +112,19 @@ public:
 	const pa_dev_list& Sources() const { return(m_sources); }
 	PADeviceInfo* Source(uint32_t idx); /* returns NULL if not found */
 	
+	const pa_client_list& Clients() const { return(m_clients); }
+	PAClientInfo* Client(uint32_t idx); /* returns NULL if not found */
+	
+	const pa_sink_input_list& SinkInputs() const { return(m_sink_inputs); }
+	PASinkInputInfo* SinkInput(uint32_t idx); /* returns NULL if not found */
+	
+	
 	
 	/* find a sink/source where name is a substring of the card name. the first found will be returned
 	 * , returns -1 if not found */
 	uint32_t getSink(const string& name); 
 	uint32_t getSource(const string& name);
+	uint32_t getSinkInputFromClient(const string& client_name);
 	
 	/* volume */
 	
@@ -93,17 +134,23 @@ public:
 	 * * or / for logarithmical in/decrease
 	 */
 	void setSinkVolume(uint32_t idx, const string& volume, const vector<int>* channel_list=NULL);
-	 
 	void setSinkVolume(uint32_t idx, const pa_cvolume& volume);
+	
+	/* playback volume */
+	void setSinkInputVolume(uint32_t idx, const string& volume, const vector<int>* channel_list=NULL);
+	void setSinkInputVolume(uint32_t idx, const pa_cvolume& volume);
 	
 private:
 	
-	void InitDevices();
+	void InitPAInfo();
 	
 	void applyVolume(const string& volume, pa_volume_t& value);
 	
 	pa_dev_list m_sinks;
 	pa_dev_list m_sources;
+	
+	pa_client_list m_clients;
+	pa_sink_input_list m_sink_inputs; /* these are the connected playback streams */
 	
 	/* pulseaudio stuff */
 	pa_context* m_pa_context;

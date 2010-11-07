@@ -79,6 +79,41 @@ string PADeviceInfo::State() const {
 	return("unknown");
 }
 
+PAClientInfo::PAClientInfo(const pa_client_info& info) 
+	: index(info.index), name(info.name ? info.name : ""), owner_module(info.owner_module)
+	, driver(info.driver ? info.driver : "") {
+}
+
+PASinkInputInfo::PASinkInputInfo(const pa_sink_input_info& info)
+	: index(info.index), name(info.name ? info.name : ""), owner_module(info.owner_module)
+	, client(info.client), sink(info.sink), sample_spec(info.sample_spec), volume(info.volume)
+	, buffer_usec(info.buffer_usec), sink_usec(info.sink_usec), driver(info.driver ? info.driver : "")
+	, mute(info.mute)
+	, sink_obj(NULL), client_obj(NULL) {
+}
+
+string PASinkInputInfo::Info() const {
+	ostringstream ret;
+	ret << "idx " << index << " name: " << name;
+	if(client_obj) {
+		ret << " (client: " << client_obj->name << ")";
+	}
+	ret << endl;
+	if(sink_obj && sink_obj->name.length()>0) {
+		ret << "sink: " << sink_obj->name << " (idx = " << sink_obj->index << ")\n";
+	}
+	ret << "mute: " << mute << "\n";
+	
+	for(uint8_t i=0; i<volume.channels; ++i) {
+		ret << "channel " << (int)i << ": " << volume.values[i] << " (" 
+				<< roundStr((float)volume.values[i]/PA_VOLUME_NORM*100.0, 1) << " %)";
+		if(i!=volume.channels-1) ret << "\n";
+	}
+	
+	
+	return(ret.str());
+}
+
 
 /*////////////////////////////////////////////////////////////////////////////////////////////////
  ** PulseAudio Callback functions
@@ -139,6 +174,47 @@ void pa_sourcelist_cb(pa_context *c, const pa_source_info *l, int eol, void *use
 	(*pa_device_list)[l->index]=device;
 }
 
+
+void pa_client_cb(pa_context * context, const pa_client_info *i, int eol, void *userdata) {
+
+	pa_client_list* client_list = (pa_client_list*) userdata;
+	
+	if (eol < 0) {
+		if (pa_context_errno(context) == PA_ERR_NOENTITY)
+			return;
+
+		LOG(ERROR, "client callback error");
+		return;
+	}
+
+	if (eol > 0) {
+		return;
+	}
+
+	PAClientInfo* client=new PAClientInfo(*i);
+	(*client_list)[i->index]=client;
+}
+
+void pa_sink_input_cb(pa_context * context, const pa_sink_input_info *i, int eol, void *userdata) {
+	
+	pa_sink_input_list* sink_inputs = (pa_sink_input_list*) userdata;
+	
+	if (eol < 0) {
+		if (pa_context_errno(context) == PA_ERR_NOENTITY)
+			return;
+		
+		LOG(ERROR, "sink input callback error");
+		return;
+	}
+
+	if (eol > 0) { //end of list
+		return;
+	}
+
+	PASinkInputInfo* input=new PASinkInputInfo(*i);
+	(*sink_inputs)[i->index]=input;
+}
+
 //volume change callback
 void pa_volume_change_cb(pa_context* c, int success, void *userdata) {
 	
@@ -177,7 +253,7 @@ void PAManager::Init() {
 	pa_context_connect(m_pa_context, NULL, (pa_context_flags_t)0, NULL);
 	
 
-	InitDevices();
+	InitPAInfo();
 	
 	
 }
@@ -207,12 +283,23 @@ void PAManager::DeInit() {
 		delete(iter->second);
 	}
 	m_sources.clear();
+	
+	for(pa_client_list::iterator iter=m_clients.begin(); iter!=m_clients.end(); ++iter) {
+		delete(iter->second);
+	}
+	m_clients.clear();
+	
+	for(pa_sink_input_list::iterator iter=m_sink_inputs.begin(); iter!=m_sink_inputs.end(); ++iter) {
+		delete(iter->second);
+	}
+	m_sink_inputs.clear();
+	
 }
 
 
-void PAManager::InitDevices() {
+void PAManager::InitPAInfo() {
 
-	// We'll need these state variables to keep track of our requests
+	
 	int state = 0;
 	m_pa_ready=0;
 	pa_operation *pa_op=NULL;
@@ -271,6 +358,26 @@ void PAManager::InitDevices() {
 				break;
 			case 2:
 				if (pa_operation_get_state(pa_op) == PA_OPERATION_DONE) {
+					pa_operation_unref(pa_op);
+					
+					//get client info
+		            pa_op=pa_context_get_client_info_list(m_pa_context, pa_client_cb, &m_clients);
+		            
+		            ++state;
+				}
+				break;
+			case 3:
+				if (pa_operation_get_state(pa_op) == PA_OPERATION_DONE) {
+					pa_operation_unref(pa_op);
+					
+					//get the applications that use a sink
+		            pa_op = pa_context_get_sink_input_info_list(m_pa_context, pa_sink_input_cb, &m_sink_inputs);
+		            
+		            ++state;
+				}
+				break;
+			case 4:
+				if (pa_operation_get_state(pa_op) == PA_OPERATION_DONE) {
 					// Now we're done, clean up
 					pa_operation_unref(pa_op);
 					bDone=true;
@@ -281,6 +388,12 @@ void PAManager::InitDevices() {
 				THROW_s(EGENERAL, "Unexpected state. This MUST NOT happen!");
 			}
 		}
+	}
+	
+	//fill the objects of sink inputs
+	for(pa_sink_input_list::iterator iter=m_sink_inputs.begin(); iter!=m_sink_inputs.end(); ++iter) {
+		iter->second->client_obj=Client(iter->second->client);
+		iter->second->sink_obj=Sink(iter->second->sink);
 	}
 }
 
@@ -294,6 +407,18 @@ PADeviceInfo* PAManager::Sink(uint32_t idx) {
 PADeviceInfo* PAManager::Source(uint32_t idx) {
 	pa_dev_list::iterator iter = m_sources.find(idx);
 	if(iter==m_sources.end()) return(NULL);
+	return(iter->second);
+}
+
+PAClientInfo* PAManager::Client(uint32_t idx) {
+	pa_client_list::iterator iter = m_clients.find(idx);
+	if(iter==m_clients.end()) return(NULL);
+	return(iter->second);
+}
+
+PASinkInputInfo* PAManager::SinkInput(uint32_t idx) {
+	pa_sink_input_list::iterator iter = m_sink_inputs.find(idx);
+	if(iter==m_sink_inputs.end()) return(NULL);
 	return(iter->second);
 }
 
@@ -312,25 +437,15 @@ uint32_t PAManager::getSource(const string& name) {
 	return((uint32_t)-1);
 }
 
-
-void PAManager::setSinkVolume(uint32_t idx, const pa_cvolume& volume) {
-	
-	pa_operation* o;
-	m_pa_ready=0;
-	
-	if(!(o = pa_context_set_sink_volume_by_index(m_pa_context, idx, &volume, pa_volume_change_cb, &m_pa_ready))) {
-		LOG(ERROR, "pa_context_set_sink_volume_by_index() for index %i failed", idx);
-	} else {
-		pa_operation_unref(o);
+uint32_t PAManager::getSinkInputFromClient(const string& client_name) {
+	PAClientInfo* client;
+	for(pa_sink_input_list::iterator iter=m_sink_inputs.begin(); iter!=m_sink_inputs.end(); ++iter) {
+		if((client=iter->second->client_obj)) {
+			if(cmpInsensitive(client->name, client_name)) return(iter->first);
+		}
 	}
-	
-	while(m_pa_ready==0) {
-		//wait for the callback
-		pa_mainloop_iterate(m_pa_mainloop, 1, NULL);
-	}
-	
+	return((uint32_t)-1);
 }
-
 
 void PAManager::setSinkVolume(uint32_t idx, const string& volume, const vector<int>* channel_list) {
 	PADeviceInfo* sink=Sink(idx);
@@ -354,6 +469,65 @@ void PAManager::setSinkVolume(uint32_t idx, const string& volume, const vector<i
 	}
 	setSinkVolume(idx, vol);
 	
+}
+
+
+void PAManager::setSinkVolume(uint32_t idx, const pa_cvolume& volume) {
+	
+	pa_operation* o;
+	m_pa_ready=0;
+	
+	if(!(o = pa_context_set_sink_volume_by_index(m_pa_context, idx, &volume, pa_volume_change_cb, &m_pa_ready))) {
+		LOG(ERROR, "pa_context_set_sink_volume_by_index() for index %i failed", idx);
+	} else {
+		pa_operation_unref(o);
+	}
+	
+	while(m_pa_ready==0) {
+		//wait for the callback
+		pa_mainloop_iterate(m_pa_mainloop, 1, NULL);
+	}
+	
+}
+
+
+void PAManager::setSinkInputVolume(uint32_t idx, const string& volume, const vector<int>* channel_list) {
+	PASinkInputInfo* sink_input=SinkInput(idx);
+	ASSERT_THROW_e(sink_input, EINVALID_PARAMETER, "playback with idx %i not found", idx);
+	ASSERT_THROW(volume.length()>0, EINVALID_PARAMETER);
+	
+	pa_cvolume& vol=sink_input->volume;
+	
+	if(channel_list && channel_list->size()>0) {
+		for(size_t i=0; i<channel_list->size(); ++i) {
+			if((*channel_list)[i]>=0 && (*channel_list)[i]<vol.channels) {
+				applyVolume(volume, vol.values[(*channel_list)[i]]);
+			} else {
+				LOG(ERROR, "playback %i does not have a channel with index %i", idx, (*channel_list)[i]);
+			}
+		}
+	} else { //all channels
+		for(uint8_t i=0; i<vol.channels; ++i) {
+			applyVolume(volume, vol.values[i]);
+		}
+	}
+	setSinkInputVolume(idx, vol);
+}
+
+void PAManager::setSinkInputVolume(uint32_t idx, const pa_cvolume& volume) {
+	pa_operation* o;
+	m_pa_ready=0;
+	
+	if(!(o = pa_context_set_sink_input_volume(m_pa_context, idx, &volume, pa_volume_change_cb, &m_pa_ready))) {
+		LOG(ERROR, "pa_context_set_sink_input_volume() for index %i failed", idx);
+	} else {
+		pa_operation_unref(o);
+	}
+	
+	while(m_pa_ready==0) {
+		//wait for the callback
+		pa_mainloop_iterate(m_pa_mainloop, 1, NULL);
+	}
 }
 
 void PAManager::applyVolume(const string& volume, pa_volume_t& value) {

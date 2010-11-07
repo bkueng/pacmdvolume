@@ -56,9 +56,14 @@ void CMain::parseCommandLine(int argc, char *argv[]) {
 	m_parameters->addTask("list", 'l');
 	m_parameters->addTask("list-sink", ' ');
 	m_parameters->addTask("list-source", ' ');
+	m_parameters->addTask("list-playback", ' ');
 	
 	m_parameters->addParam("set-volume", 's');
 	m_parameters->addParam("channels", 'n');
+	
+	m_parameters->addParam("set-playback-volume", 'p');
+	m_parameters->addParam("index", 'i');
+	m_parameters->addParam("client-name", 'I');
 	
 	
 	m_cl_parse_result=m_parameters->parse();
@@ -67,13 +72,15 @@ void CMain::parseCommandLine(int argc, char *argv[]) {
 
 void CMain::printHelp() {
 	printf("Usage:\n"
-		" "APP_NAME" [-v] [-c or -C] --list\n"
-		" "APP_NAME" [-v] [-c or -C] --set-volume <volume> [-n <channels>]\n"
+		" "APP_NAME" [-v] [-c <c> or -C <c>] --list\n"
+		" "APP_NAME" [-v] [-c <c> or -C <c>] -s <volume> [-n <channels>]\n"
+		" "APP_NAME" [-v] [-i <idx> or -I <c>] -p <volume> [-n <channels>]\n"
 		" "APP_NAME" --version\n"
 		"\n"
-		"  -l, --list                      list all sinks and sources\n"
-		"      --list-sink                 list sinks only\n"
-		"      --list-source               list sources only\n"
+		"  -l, --list                      list all sinks, sources and playbacks\n"
+		"      --list-sink                 list sinks\n"
+		"      --list-source               list sources\n"
+		"      --list-playback             list playback\n"
 		"\n"
 		"  -s, --set-volume <volume>       set sink volume\n"
 		"                                  <volume> format:\n"
@@ -81,6 +88,10 @@ void CMain::printHelp() {
 		"                                  + or - for increase/decrease\n"
 		"                                  * or / for logarithmical increase/decrease\n"
 		"                                  example: -s *10%%\n"
+		"  -p, --set-playback-volume <volume>\n"
+		"                                  set playback volume\n"
+		"     -i, --index <index>          playback index\n"
+		"     -I, --client-name <name>     playback client name\n"
 		"     -n, --channels <channels>    specify channels\n"
 		"                                  (comma-separated list with channel indexes)\n"
 		
@@ -185,19 +196,28 @@ void CMain::processArgs() {
 	/* list devices */
 	bool bPrint_sinks=false;
 	bool bPrint_sources=false;
+	bool bPrint_playbacks=false;
+	int print_multiple=0;
 	
 	if(m_parameters->setTask("list")->bGiven) {
-		bPrint_sinks=bPrint_sources=true;
+		bPrint_sinks=bPrint_sources=bPrint_playbacks=true;
+		print_multiple=3;
 	} else {
 		if(m_parameters->setTask("list-sink")->bGiven) {
 			bPrint_sinks=true;
+			++print_multiple;
 		}
 		if(m_parameters->setTask("list-source")->bGiven) {
 			bPrint_sources=true;
+			++print_multiple;
+		}
+		if(m_parameters->setTask("list-playback")->bGiven) {
+			bPrint_playbacks=true;
+			++print_multiple;
 		}
 	}
 	
-	if(bPrint_sources && bPrint_sinks) cout << "sinks:" << endl << endl;
+	if(print_multiple>1 && bPrint_sinks) cout << "sinks:" << endl << endl;
 	if(bPrint_sinks) {
 		if(sink_card_idx==(uint32_t)-2) {
 			THROW_s(EINVALID_PARAMETER, "specified sink not found");
@@ -210,7 +230,7 @@ void CMain::processArgs() {
 		}
 	}
 	
-	if(bPrint_sources && bPrint_sinks) cout << "sources:" << endl << endl;
+	if(print_multiple>1 && bPrint_sources) cout << "sources:" << endl << endl;
 	if(bPrint_sources) {
 		if(source_card_idx==(uint32_t)-2) {
 			THROW_s(EINVALID_PARAMETER, "specified source not found");
@@ -220,6 +240,19 @@ void CMain::processArgs() {
 			}
 		} else {
 			cout << m_pa_manager.Source(source_card_idx)->Info() << endl << endl;
+		}
+	}
+	
+	if(print_multiple>1 && bPrint_playbacks) cout << "playback:" << endl << endl;
+	if(bPrint_playbacks) {
+		if(sink_card_idx==(uint32_t)-2) {
+			THROW_s(EINVALID_PARAMETER, "specified source not found");
+		} else {
+			for(pa_sink_input_list::const_iterator iter=m_pa_manager.SinkInputs().begin(); iter!=m_pa_manager.SinkInputs().end(); ++iter) {
+				if(sink_card_idx==(uint32_t)-1 || sink_card_idx==iter->second->sink) {
+					cout << iter->second->Info() << endl << endl;
+				}
+			}
 		}
 	}
 	
@@ -246,6 +279,30 @@ void CMain::processArgs() {
 			m_pa_manager.setSinkVolume(sink_card_idx, vol_change, &channels);
 		}
 	}
+	
+	uint32_t playback_idx=-1;
+	string s;
+	if(m_parameters->getParam("index", s)) {
+		if(sscanf(s.c_str(), "%i", &playback_idx)!=1) {
+			LOG(WARN, "failed to parse specified index %s", s.c_str());
+		}
+	} else if(m_parameters->getParam("client-name", s)) {
+		playback_idx=m_pa_manager.getSinkInputFromClient(s);
+		ASSERT_THROW_e(playback_idx!=(uint32_t)-1, EINVALID_PARAMETER, "client name %s not found", s.c_str());
+	}
+	
+	if(m_parameters->getParam("set-playback-volume", vol_change)) {
+		
+		/* change playback volume */
+		if(playback_idx==(uint32_t)-1) {
+			for(pa_dev_list::const_iterator iter=m_pa_manager.Sinks().begin(); iter!=m_pa_manager.Sinks().end(); ++iter) {
+				m_pa_manager.setSinkInputVolume(iter->first, vol_change, &channels);
+			}
+		} else {
+			m_pa_manager.setSinkInputVolume(playback_idx, vol_change, &channels);
+		}
+	}
+	
 	
 }
 
