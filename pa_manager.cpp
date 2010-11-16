@@ -452,22 +452,9 @@ void PAManager::setSinkVolume(uint32_t idx, const string& volume, const vector<i
 	ASSERT_THROW_e(sink, EINVALID_PARAMETER, "sink with idx %i not found", idx);
 	ASSERT_THROW(volume.length()>0, EINVALID_PARAMETER);
 	
-	pa_cvolume& vol=sink->volume;
+	applyVolumeChannel(volume, sink->volume, channel_list);
 	
-	if(channel_list && channel_list->size()>0) {
-		for(size_t i=0; i<channel_list->size(); ++i) {
-			if((*channel_list)[i]>=0 && (*channel_list)[i]<vol.channels) {
-				applyVolume(volume, vol.values[(*channel_list)[i]]);
-			} else {
-				LOG(ERROR, "sink %i does not have a channel with index %i", idx, (*channel_list)[i]);
-			}
-		}
-	} else { //all channels
-		for(uint8_t i=0; i<vol.channels; ++i) {
-			applyVolume(volume, vol.values[i]);
-		}
-	}
-	setSinkVolume(idx, vol);
+	setSinkVolume(idx, sink->volume);
 	
 }
 
@@ -491,27 +478,42 @@ void PAManager::setSinkVolume(uint32_t idx, const pa_cvolume& volume) {
 }
 
 
+void PAManager::setSourceVolume(uint32_t idx, const string& volume, const vector<int>* channel_list) {
+	PADeviceInfo* source=Source(idx);
+	ASSERT_THROW_e(source, EINVALID_PARAMETER, "source with idx %i not found", idx);
+	ASSERT_THROW(volume.length()>0, EINVALID_PARAMETER);
+	
+	applyVolumeChannel(volume, source->volume, channel_list);
+	
+	setSourceVolume(idx, source->volume);
+}
+
+void PAManager::setSourceVolume(uint32_t idx, const pa_cvolume& volume) {
+	
+	pa_operation* o;
+	m_pa_ready=0;
+	
+	if(!(o = pa_context_set_source_volume_by_index(m_pa_context, idx, &volume, pa_volume_change_cb, &m_pa_ready))) {
+		LOG(ERROR, "pa_context_set_source_volume_by_index() for index %i failed", idx);
+	} else {
+		pa_operation_unref(o);
+	}
+	
+	while(m_pa_ready==0) {
+		//wait for the callback
+		pa_mainloop_iterate(m_pa_mainloop, 1, NULL);
+	}
+}
+
+
 void PAManager::setSinkInputVolume(uint32_t idx, const string& volume, const vector<int>* channel_list) {
 	PASinkInputInfo* sink_input=SinkInput(idx);
 	ASSERT_THROW_e(sink_input, EINVALID_PARAMETER, "playback with idx %i not found", idx);
 	ASSERT_THROW(volume.length()>0, EINVALID_PARAMETER);
 	
-	pa_cvolume& vol=sink_input->volume;
+	applyVolumeChannel(volume, sink_input->volume, channel_list);
 	
-	if(channel_list && channel_list->size()>0) {
-		for(size_t i=0; i<channel_list->size(); ++i) {
-			if((*channel_list)[i]>=0 && (*channel_list)[i]<vol.channels) {
-				applyVolume(volume, vol.values[(*channel_list)[i]]);
-			} else {
-				LOG(ERROR, "playback %i does not have a channel with index %i", idx, (*channel_list)[i]);
-			}
-		}
-	} else { //all channels
-		for(uint8_t i=0; i<vol.channels; ++i) {
-			applyVolume(volume, vol.values[i]);
-		}
-	}
-	setSinkInputVolume(idx, vol);
+	setSinkInputVolume(idx, sink_input->volume);
 }
 
 void PAManager::setSinkInputVolume(uint32_t idx, const pa_cvolume& volume) {
@@ -579,6 +581,22 @@ void PAManager::applyVolume(const string& volume, pa_volume_t& value) {
 		THROW_s(EINVALID_PARAMETER, "volume format %s not recogniced", volume.c_str());
 	}
 	
+}
+
+void PAManager::applyVolumeChannel(const string& volume, pa_cvolume& vol, const vector<int>* channel_list) {
+	if(channel_list && channel_list->size()>0) {
+		for(size_t i=0; i<channel_list->size(); ++i) {
+			if((*channel_list)[i]>=0 && (*channel_list)[i]<vol.channels) {
+				applyVolume(volume, vol.values[(*channel_list)[i]]);
+			} else {
+				LOG(ERROR, "device does not have a channel with index %i", (*channel_list)[i]);
+			}
+		}
+	} else { //all channels
+		for(uint8_t i=0; i<vol.channels; ++i) {
+			applyVolume(volume, vol.values[i]);
+		}
+	}
 }
 
 

@@ -136,6 +136,9 @@ public:
 	void setSinkVolume(uint32_t idx, const string& volume, const vector<int>* channel_list=NULL);
 	void setSinkVolume(uint32_t idx, const pa_cvolume& volume);
 	
+	void setSourceVolume(uint32_t idx, const string& volume, const vector<int>* channel_list=NULL);
+	void setSourceVolume(uint32_t idx, const pa_cvolume& volume);
+	
 	/* playback volume */
 	void setSinkInputVolume(uint32_t idx, const string& volume, const vector<int>* channel_list=NULL);
 	void setSinkInputVolume(uint32_t idx, const pa_cvolume& volume);
@@ -145,6 +148,8 @@ private:
 	void InitPAInfo();
 	
 	void applyVolume(const string& volume, pa_volume_t& value);
+	// this will call applyVolume for all chosen channels:
+	void applyVolumeChannel(const string& volume, pa_cvolume& vol, const vector<int>* channel_list);
 	
 	pa_dev_list m_sinks;
 	pa_dev_list m_sources;

@@ -61,6 +61,7 @@ void CMain::parseCommandLine(int argc, char *argv[]) {
 	m_parameters->addParam("set-volume", 's');
 	m_parameters->addParam("channels", 'n');
 	
+	m_parameters->addParam("set-source-volume", ' ');
 	m_parameters->addParam("set-playback-volume", 'p');
 	m_parameters->addParam("index", 'i');
 	m_parameters->addParam("client-name", 'I');
@@ -88,6 +89,8 @@ void CMain::printHelp() {
 		"                                  + or - for increase/decrease\n"
 		"                                  * or / for logarithmical increase/decrease\n"
 		"                                  example: -s *10%%\n"
+		"      --set-source-volume <volume>\n"
+		"                                  set source volume\n"
 		"  -p, --set-playback-volume <volume>\n"
 		"                                  set playback volume\n"
 		"     -i, --index <index>          playback index\n"
@@ -277,6 +280,20 @@ void CMain::processArgs() {
 			}
 		} else {
 			m_pa_manager.setSinkVolume(sink_card_idx, vol_change, &channels);
+		}
+	}
+	
+	if(m_parameters->getParam("set-source-volume", vol_change)) {
+		
+		/* change source volume */
+		if(source_card_idx==(uint32_t)-2) {
+			THROW_s(EINVALID_PARAMETER, "specified source not found");
+		} else if(source_card_idx==(uint32_t)-1) {
+			for(pa_dev_list::const_iterator iter=m_pa_manager.Sources().begin(); iter!=m_pa_manager.Sources().end(); ++iter) {
+				m_pa_manager.setSourceVolume(iter->first, vol_change, &channels);
+			}
+		} else {
+			m_pa_manager.setSourceVolume(source_card_idx, vol_change, &channels);
 		}
 	}
 	
