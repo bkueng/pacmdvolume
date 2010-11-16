@@ -132,16 +132,21 @@ public:
 	 * absolute value or with %
 	 * + or - for in/decrease
 	 * * or / for logarithmical in/decrease
+	 * 
+	 * volume can also be mute or unmute
 	 */
 	void setSinkVolume(uint32_t idx, const string& volume, const vector<int>* channel_list=NULL);
 	void setSinkVolume(uint32_t idx, const pa_cvolume& volume);
+	void setSinkMute(uint32_t idx, int mute);
 	
 	void setSourceVolume(uint32_t idx, const string& volume, const vector<int>* channel_list=NULL);
 	void setSourceVolume(uint32_t idx, const pa_cvolume& volume);
+	void setSourceMute(uint32_t idx, int mute);
 	
 	/* playback volume */
 	void setSinkInputVolume(uint32_t idx, const string& volume, const vector<int>* channel_list=NULL);
 	void setSinkInputVolume(uint32_t idx, const pa_cvolume& volume);
+	void setSinkInputMute(uint32_t idx, int mute);
 	
 private:
 	

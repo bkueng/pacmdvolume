@@ -452,7 +452,13 @@ void PAManager::setSinkVolume(uint32_t idx, const string& volume, const vector<i
 	ASSERT_THROW_e(sink, EINVALID_PARAMETER, "sink with idx %i not found", idx);
 	ASSERT_THROW(volume.length()>0, EINVALID_PARAMETER);
 	
-	applyVolumeChannel(volume, sink->volume, channel_list);
+	if(volume=="mute") {
+		setSinkMute(idx, 1);
+	} else if(volume=="unmute") {
+		setSinkMute(idx, 0);
+	} else {
+		applyVolumeChannel(volume, sink->volume, channel_list);
+	}
 	
 	setSinkVolume(idx, sink->volume);
 	
@@ -477,13 +483,36 @@ void PAManager::setSinkVolume(uint32_t idx, const pa_cvolume& volume) {
 	
 }
 
+void PAManager::setSinkMute(uint32_t idx, int mute) {
+	
+	pa_operation* o;
+	m_pa_ready=0;
+	
+	if(!(o = pa_context_set_sink_mute_by_index(m_pa_context, idx, mute, pa_volume_change_cb, &m_pa_ready))) {
+		LOG(ERROR, "pa_context_set_sink_mute_by_index() for index %i failed", idx);
+	} else {
+		pa_operation_unref(o);
+	}
+	
+	while(m_pa_ready==0) {
+		//wait for the callback
+		pa_mainloop_iterate(m_pa_mainloop, 1, NULL);
+	}
+}
+
 
 void PAManager::setSourceVolume(uint32_t idx, const string& volume, const vector<int>* channel_list) {
 	PADeviceInfo* source=Source(idx);
 	ASSERT_THROW_e(source, EINVALID_PARAMETER, "source with idx %i not found", idx);
 	ASSERT_THROW(volume.length()>0, EINVALID_PARAMETER);
 	
-	applyVolumeChannel(volume, source->volume, channel_list);
+	if(volume=="mute") {
+		setSourceMute(idx, 1);
+	} else if(volume=="unmute") {
+		setSourceMute(idx, 0);
+	} else {
+		applyVolumeChannel(volume, source->volume, channel_list);
+	}
 	
 	setSourceVolume(idx, source->volume);
 }
@@ -505,13 +534,36 @@ void PAManager::setSourceVolume(uint32_t idx, const pa_cvolume& volume) {
 	}
 }
 
+void PAManager::setSourceMute(uint32_t idx, int mute) {
+	
+	pa_operation* o;
+	m_pa_ready=0;
+	
+	if(!(o = pa_context_set_source_mute_by_index(m_pa_context, idx, mute, pa_volume_change_cb, &m_pa_ready))) {
+		LOG(ERROR, "pa_context_set_source_mute_by_index() for index %i failed", idx);
+	} else {
+		pa_operation_unref(o);
+	}
+	
+	while(m_pa_ready==0) {
+		//wait for the callback
+		pa_mainloop_iterate(m_pa_mainloop, 1, NULL);
+	}
+}
+
 
 void PAManager::setSinkInputVolume(uint32_t idx, const string& volume, const vector<int>* channel_list) {
 	PASinkInputInfo* sink_input=SinkInput(idx);
 	ASSERT_THROW_e(sink_input, EINVALID_PARAMETER, "playback with idx %i not found", idx);
 	ASSERT_THROW(volume.length()>0, EINVALID_PARAMETER);
 	
-	applyVolumeChannel(volume, sink_input->volume, channel_list);
+	if(volume=="mute") {
+		setSinkInputMute(idx, 1);
+	} else if(volume=="unmute") {
+		setSinkInputMute(idx, 0);
+	} else {
+		applyVolumeChannel(volume, sink_input->volume, channel_list);
+	}
 	
 	setSinkInputVolume(idx, sink_input->volume);
 }
@@ -522,6 +574,23 @@ void PAManager::setSinkInputVolume(uint32_t idx, const pa_cvolume& volume) {
 	
 	if(!(o = pa_context_set_sink_input_volume(m_pa_context, idx, &volume, pa_volume_change_cb, &m_pa_ready))) {
 		LOG(ERROR, "pa_context_set_sink_input_volume() for index %i failed", idx);
+	} else {
+		pa_operation_unref(o);
+	}
+	
+	while(m_pa_ready==0) {
+		//wait for the callback
+		pa_mainloop_iterate(m_pa_mainloop, 1, NULL);
+	}
+}
+
+void PAManager::setSinkInputMute(uint32_t idx, int mute) {
+	
+	pa_operation* o;
+	m_pa_ready=0;
+	
+	if(!(o = pa_context_set_sink_input_mute(m_pa_context, idx, mute, pa_volume_change_cb, &m_pa_ready))) {
+		LOG(ERROR, "pa_context_set_sink_input_mute() for index %i failed", idx);
 	} else {
 		pa_operation_unref(o);
 	}
