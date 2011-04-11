@@ -1,3 +1,9 @@
++ Release v1.1
+
++ example calls for --help output
++ use all sinks/sources/playbacks that match to given name
+
+
 + Release v1.0
 
 + list sinks, sources and connected clients (playback)
