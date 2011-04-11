@@ -11,3 +11,8 @@
 
 /pacmdvolume
 
+.cproject
+.project
+/do-*
+/TODO
+
