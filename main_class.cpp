@@ -102,8 +102,7 @@ void CMain::printHelp() {
 		"\n"
 		"  -c, --card <idx>                specify card index\n"
 		"  -C, --card-name <name>          specify card name\n"
-		"                                  (can also be a substring of the name\n"
-		"                                  the first that is found will be used)\n"
+		"                                  (can also be a substring of the name)\n"
 		"\n"
 		"  -v, --verbose                   print debug messages\n"
 		"  -h, --help                      print this message\n"
@@ -172,21 +171,25 @@ void CMain::processArgs() {
 	m_pa_manager.Init();
 	
 	/* get card */
-	uint32_t sink_card_idx=-1; //-2 means a card is not found
+	uint32_t sink_card_idx=-1; //-2: card is not found, -1: use all, 0: use vector
+	vector<uint32_t> sink_card_indexes;
 	uint32_t source_card_idx=-1;
+	vector<uint32_t> source_card_indexes;
 	
 	string card_val;
 	if(m_parameters->getParam("card", card_val)) {
 		int card_idx;
 		if(sscanf(card_val.c_str(), "%i", &card_idx)==1) {
 			if(m_pa_manager.Sink(card_idx)) {
-				sink_card_idx=card_idx;
+				sink_card_indexes.push_back(card_idx);
+				sink_card_idx=0;
 			} else {
 				sink_card_idx=-2;
 				LOG(DEBUG, "sink with card idx %i not found", card_idx);
 			}
 			if(m_pa_manager.Source(card_idx)) {
-				source_card_idx=card_idx;
+				source_card_indexes.push_back(card_idx);
+				source_card_idx=0;
 			} else {
 				source_card_idx=-2;
 				LOG(DEBUG, "source with card idx %i not found", card_idx);
@@ -195,11 +198,15 @@ void CMain::processArgs() {
 			THROW_s(EINVALID_PARAMETER, "Failed to parse card idx %s", card_val.c_str());
 		}
 	} else if(m_parameters->getParam("card-name", card_val)) {
-		if((sink_card_idx=m_pa_manager.getSink(card_val)) == (uint32_t)-1) {
+		if(m_pa_manager.getSinks(card_val, sink_card_indexes)) {
+			sink_card_idx=0;
+		} else {
 			sink_card_idx=-2;
 			LOG(DEBUG, "sink with name %s not found", card_val.c_str());
 		}
-		if((source_card_idx=m_pa_manager.getSource(card_val)) == (uint32_t)-1) {
+		if(m_pa_manager.getSources(card_val, source_card_indexes)) {
+			source_card_idx=0;
+		} else {
 			source_card_idx=-2;
 			LOG(DEBUG, "source with name %s not found", card_val.c_str());
 		}
@@ -239,7 +246,8 @@ void CMain::processArgs() {
 				cout << iter->second->Info() << endl << endl;
 			}
 		} else {
-			cout << m_pa_manager.Sink(sink_card_idx)->Info() << endl << endl;
+			for(size_t i=0; i<sink_card_indexes.size(); ++i)
+				cout << m_pa_manager.Sink(sink_card_indexes[i])->Info() << endl << endl;
 		}
 	}
 	
@@ -252,7 +260,8 @@ void CMain::processArgs() {
 				cout << iter->second->Info() << endl << endl;
 			}
 		} else {
-			cout << m_pa_manager.Source(source_card_idx)->Info() << endl << endl;
+			for(size_t i=0; i<source_card_indexes.size(); ++i)
+				cout << m_pa_manager.Source(source_card_indexes[i])->Info() << endl << endl;
 		}
 	}
 	
@@ -262,8 +271,14 @@ void CMain::processArgs() {
 			THROW_s(EINVALID_PARAMETER, "specified source not found");
 		} else {
 			for(pa_sink_input_list::const_iterator iter=m_pa_manager.SinkInputs().begin(); iter!=m_pa_manager.SinkInputs().end(); ++iter) {
-				if(sink_card_idx==(uint32_t)-1 || sink_card_idx==iter->second->sink) {
+				if(sink_card_idx==(uint32_t)-1) {
 					cout << iter->second->Info() << endl << endl;
+				} else {
+					for(size_t i=0; i<sink_card_indexes.size(); ++i) {
+						if(iter->second->sink == sink_card_indexes[i]) {
+							cout << iter->second->Info() << endl << endl;
+						}
+					}
 				}
 			}
 		}
@@ -289,7 +304,9 @@ void CMain::processArgs() {
 				m_pa_manager.setSinkVolume(iter->first, vol_change, &channels);
 			}
 		} else {
-			m_pa_manager.setSinkVolume(sink_card_idx, vol_change, &channels);
+			for(size_t i=0; i<sink_card_indexes.size(); ++i) {
+				m_pa_manager.setSinkVolume(sink_card_indexes[i], vol_change, &channels);
+			}
 		}
 	}
 	
@@ -303,30 +320,37 @@ void CMain::processArgs() {
 				m_pa_manager.setSourceVolume(iter->first, vol_change, &channels);
 			}
 		} else {
-			m_pa_manager.setSourceVolume(source_card_idx, vol_change, &channels);
+			for(size_t i=0; i<source_card_indexes.size(); ++i) {
+				m_pa_manager.setSourceVolume(source_card_indexes[i], vol_change, &channels);
+			}
 		}
 	}
 	
-	uint32_t playback_idx=-1;
+	vector<uint32_t> playback_indexes;
+	uint32_t playback_idx;
 	string s;
 	if(m_parameters->getParam("index", s)) {
 		if(sscanf(s.c_str(), "%i", &playback_idx)!=1) {
 			LOG(WARN, "failed to parse specified index %s", s.c_str());
+		} else {
+			playback_indexes.push_back(playback_idx);
 		}
 	} else if(m_parameters->getParam("client-name", s)) {
-		playback_idx=m_pa_manager.getSinkInputFromClient(s);
-		ASSERT_THROW_e(playback_idx!=(uint32_t)-1, EINVALID_PARAMETER, "client name %s not found", s.c_str());
+		m_pa_manager.getSinkInputsFromClient(s, playback_indexes);
+		ASSERT_THROW_e(playback_indexes.size()!=0, EINVALID_PARAMETER, "client name %s not found", s.c_str());
 	}
 	
 	if(m_parameters->getParam("set-playback-volume", vol_change)) {
 		
 		/* change playback volume */
-		if(playback_idx==(uint32_t)-1) {
+		if(playback_indexes.empty()) {
 			for(pa_dev_list::const_iterator iter=m_pa_manager.Sinks().begin(); iter!=m_pa_manager.Sinks().end(); ++iter) {
 				m_pa_manager.setSinkInputVolume(iter->first, vol_change, &channels);
 			}
 		} else {
-			m_pa_manager.setSinkInputVolume(playback_idx, vol_change, &channels);
+			for(size_t i=0; i<playback_indexes.size(); ++i) {
+				m_pa_manager.setSinkInputVolume(playback_indexes[i], vol_change, &channels);
+			}
 		}
 	}
 	

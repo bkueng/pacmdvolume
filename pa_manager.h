@@ -121,10 +121,14 @@ public:
 	
 	
 	/* find a sink/source where name is a substring of the card name. the first found will be returned
-	 * , returns -1 if not found */
-	uint32_t getSink(const string& name); 
+	 * , returns -1 if not found 
+	 * for the ones with bool return: true on success (vector non empty), false if non found (vector empty)*/
+	uint32_t getSink(const string& name);
+	bool getSinks(const string& name, vector<uint32_t>& sinks);
 	uint32_t getSource(const string& name);
+	bool getSources(const string& name, vector<uint32_t>& sources);
 	uint32_t getSinkInputFromClient(const string& client_name);
+	bool getSinkInputsFromClient(const string& client_name, vector<uint32_t>& inputs);
 	
 	/* volume */
 	

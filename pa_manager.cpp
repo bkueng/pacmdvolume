@@ -430,11 +430,31 @@ uint32_t PAManager::getSink(const string& name) {
 	return((uint32_t)-1);
 }
 
+bool PAManager::getSinks(const string& name, vector<uint32_t>& sinks) {
+	sinks.clear();
+	
+	for(pa_dev_list::iterator iter=m_sinks.begin(); iter!=m_sinks.end(); ++iter) {
+		if(toLower(iter->second->name).find(toLower(name))!=string::npos) sinks.push_back(iter->first);
+	}
+	
+	return(!sinks.empty());
+}
+
 uint32_t PAManager::getSource(const string& name) {
 	for(pa_dev_list::iterator iter=m_sources.begin(); iter!=m_sources.end(); ++iter) {
 		if(toLower(iter->second->name).find(toLower(name))!=string::npos) return(iter->first);
 	}
 	return((uint32_t)-1);
+}
+
+bool PAManager::getSources(const string& name, vector<uint32_t>& sources) {
+	sources.clear();
+	
+	for(pa_dev_list::iterator iter=m_sources.begin(); iter!=m_sources.end(); ++iter) {
+		if(toLower(iter->second->name).find(toLower(name))!=string::npos) sources.push_back(iter->first);
+	}
+	
+	return(!sources.empty());
 }
 
 uint32_t PAManager::getSinkInputFromClient(const string& client_name) {
@@ -445,6 +465,20 @@ uint32_t PAManager::getSinkInputFromClient(const string& client_name) {
 		}
 	}
 	return((uint32_t)-1);
+}
+
+
+bool PAManager::getSinkInputsFromClient(const string& client_name, vector<uint32_t>& inputs) {
+	inputs.clear();
+	
+	PAClientInfo* client;
+	for(pa_sink_input_list::iterator iter=m_sink_inputs.begin(); iter!=m_sink_inputs.end(); ++iter) {
+		if((client=iter->second->client_obj)) {
+			if(cmpInsensitive(client->name, client_name)) inputs.push_back(iter->first);
+		}
+	}
+	
+	return(!inputs.empty());
 }
 
 void PAManager::setSinkVolume(uint32_t idx, const string& volume, const vector<int>* channel_list) {
