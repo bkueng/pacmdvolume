@@ -108,6 +108,15 @@ void CMain::printHelp() {
 		"  -v, --verbose                   print debug messages\n"
 		"  -h, --help                      print this message\n"
 		"  --version                       print the version\n"
+		"\n"
+		"Examples:\n"
+		" "APP_NAME" --set-volume 20%% -C aureon -n 0,1\n"
+		"                                  set the output volume of channels 0 and 1 of\n"
+		"                                  card aureon to 20%%\n"
+		" "APP_NAME" --set-playback-volume +10%% -I rhythmbox\n"
+		"                                  increase the volume of client rhythmbox by 20%%\n"
+		" "APP_NAME" --set-source-volume mute -c 1\n"
+		"                                  mute the output with card index 1\n"
 		);
 }
 
