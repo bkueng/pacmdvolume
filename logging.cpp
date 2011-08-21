@@ -36,9 +36,9 @@ void CLog::Log(ELOG level, const char* file, const char* function, int line, con
 	vsprintf(buffer, fmt, args);
 	va_end (args);
 	
-	FILE* pFile = fopen(LOG_FILE,"a+");
-	if(pFile) {
-		if(level <= m_file_log) {
+	if(level <= m_file_log) {
+		FILE* pFile = fopen(LOG_FILE,"a+");
+		if(pFile) {
 			if(m_bLog_src_file[level]) {
 				/* be more verbose in debug mode */
 #ifdef _DEBUG
@@ -50,8 +50,8 @@ void CLog::Log(ELOG level, const char* file, const char* function, int line, con
 			if(m_bLog_time) fprintf(pFile, "%s %s: ", getDate().c_str(), getTime().c_str());
 			if(level==ERROR) fprintf(pFile, "Error: ");
 			fprintf(pFile, "%s\n", buffer);
+			fclose(pFile);
 		}
-		fclose(pFile);
 		++m_file_log_count[level];
 	}
 	
