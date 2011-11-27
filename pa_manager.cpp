@@ -115,6 +115,51 @@ string PASinkInputInfo::Info() const {
 }
 
 
+PACardProfileInfo::PACardProfileInfo(const pa_card_profile_info& profile) 
+	: name(profile.name), description(profile.description)
+	, n_sinks(profile.n_sinks), n_sources(profile.n_sources)
+	, priority(profile.priority) {
+	
+}
+
+
+PACardInfo::PACardInfo(const pa_card_info& card) 
+	: index(card.index), name(card.name), owner_module(card.owner_module)
+	, driver(card.driver) {
+	
+	active_profile = -1;
+	for(uint32_t i=0; i<card.n_profiles; ++i) {
+		if(card.active_profile == card.profiles+i) active_profile = (int)i;
+		profiles.push_back(new PACardProfileInfo(card.profiles[i]));
+	}
+}
+
+PACardInfo::~PACardInfo() {
+	for(size_t i=0; i<profiles.size(); ++i) delete(profiles[i]);
+}
+
+string PACardInfo::Info(bool with_profiles) const {
+	ostringstream ret;
+	ret << "idx " << index << " name: " << name << endl;
+	/*
+	ret << "owner module " << owner_module << endl;
+	ret << "driver " << driver << endl;
+	*/
+	
+	if(with_profiles) {
+		ret << "profiles:" << endl;
+		for(size_t i=0; i<profiles.size(); ++i) {
+			if((int)i == active_profile) ret << " * ";
+			else ret << "   ";
+			ret << profiles[i]->name << " (" << profiles[i]->description << 
+					")" << endl;
+		}
+	}
+	
+	return(ret.str());
+}
+
+
 /*////////////////////////////////////////////////////////////////////////////////////////////////
  ** PulseAudio Callback functions
 /*////////////////////////////////////////////////////////////////////////////////////////////////
@@ -223,6 +268,24 @@ void pa_volume_change_cb(pa_context* c, int success, void *userdata) {
 	else *ready=-1;
 }
 
+//cards
+void pa_card_cb(pa_context *, const pa_card_info *i, int eol, void *userdata) {
+	
+	pa_card_list* cards = static_cast<pa_card_list*>(userdata);
+
+    if (eol < 0) {
+        return;
+    }
+
+    if (eol > 0) {
+    	//all cards done
+        return;
+    }
+    
+    PACardInfo* card = new PACardInfo(*i);
+    (*cards)[i->index]=card;
+}
+
 
 
 
@@ -254,7 +317,6 @@ void PAManager::Init() {
 	
 
 	InitPAInfo();
-	
 	
 }
 
@@ -293,6 +355,11 @@ void PAManager::DeInit() {
 		delete(iter->second);
 	}
 	m_sink_inputs.clear();
+	
+	for(pa_card_list::iterator iter = m_cards.begin(); iter!=m_cards.end(); ++iter) {
+		delete(iter->second);
+	}
+	m_cards.clear();
 	
 }
 
@@ -383,6 +450,17 @@ void PAManager::InitPAInfo() {
 				break;
 			case 4:
 				if (pa_operation_get_state(pa_op) == PA_OPERATION_DONE) {
+					pa_operation_unref(pa_op);
+					
+					//get the cards
+		            pa_op = pa_context_get_card_info_list(m_pa_context, pa_card_cb, &m_cards);
+		            ASSERT_THROW_e(pa_op, EGENERAL, "pa_context_get_card_info_list failed");
+		            
+		            ++state;
+				}
+				break;
+			case 5:
+				if (pa_operation_get_state(pa_op) == PA_OPERATION_DONE) {
 					// Now we're done, clean up
 					pa_operation_unref(pa_op);
 					bDone=true;
@@ -424,6 +502,12 @@ PAClientInfo* PAManager::Client(uint32_t idx) {
 PASinkInputInfo* PAManager::SinkInput(uint32_t idx) {
 	pa_sink_input_list::iterator iter = m_sink_inputs.find(idx);
 	if(iter==m_sink_inputs.end()) return(NULL);
+	return(iter->second);
+}
+
+PACardInfo* PAManager::Card(uint32_t card_idx) {
+	pa_card_list::iterator iter = m_cards.find(card_idx);
+	if(iter==m_cards.end()) return(NULL);
 	return(iter->second);
 }
 
@@ -484,6 +568,18 @@ bool PAManager::getSinkInputsFromClient(const string& client_name, vector<uint32
 	}
 	
 	return(!inputs.empty());
+}
+
+bool PAManager::getCard(const string& name, vector<uint32_t>& cards) const {
+	
+	cards.clear();
+	
+	for(pa_card_list::const_iterator iter=m_cards.begin(); 
+			iter!=m_cards.end(); ++iter) {
+		if(toLower(iter->second->name).find(toLower(name))!=string::npos) cards.push_back(iter->first);
+	}
+	
+	return(!cards.empty());
 }
 
 void PAManager::setSinkVolume(uint32_t idx, const string& volume, const vector<int>* channel_list) {

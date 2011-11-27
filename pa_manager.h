@@ -90,12 +90,38 @@ struct PASinkInputInfo {
 	PAClientInfo* client_obj;
 };
 
+
+struct PACardProfileInfo {
+	PACardProfileInfo(const pa_card_profile_info& profile);
+	
+    string name;                        /**< Name of this profile */
+    string description;                 /**< Description of this profile */
+    uint32_t n_sinks;                   /**< Number of sinks this profile would create */
+    uint32_t n_sources;                 /**< Number of sources this profile would create */
+    uint32_t priority;                  /**< The higher this value is the more useful this profile is as a default */
+};
+
+struct PACardInfo {
+	PACardInfo(const pa_card_info& card);
+	~PACardInfo();
+	
+	string Info(bool with_profiles=true) const;
+	
+    uint32_t index;                      /**< Index of this card */
+    string name;                         /**< Name of this card */
+    uint32_t owner_module;               /**< Index of the owning module, or PA_INVALID_INDEX */
+    string driver;                       /**< Driver name */
+    vector<PACardProfileInfo*> profiles;         
+    int active_profile;                  /**< Pointer to active profile in the array, or -1 */
+};
+
 /*////////////////////////////////////////////////////////////////////////////////////////////////
  ** class PAManager
  * connects to pulseaudio, retrieves info and changes values
 /*////////////////////////////////////////////////////////////////////////////////////////////////
 
 typedef map<uint32_t, PADeviceInfo*> pa_dev_list;
+typedef map<uint32_t, PACardInfo*> pa_card_list; //map key is card index
 typedef map<uint32_t, PAClientInfo*> pa_client_list;
 typedef map<uint32_t, PASinkInputInfo*> pa_sink_input_list;
 
@@ -118,6 +144,8 @@ public:
 	const pa_sink_input_list& SinkInputs() const { return(m_sink_inputs); }
 	PASinkInputInfo* SinkInput(uint32_t idx); /* returns NULL if not found */
 	
+	const pa_card_list& Cards() const { return(m_cards); }
+	PACardInfo* Card(uint32_t card_idx); /* returns NULL if not found */
 	
 	
 	/* find a sink/source where name is a substring of the card name. the first found will be returned
@@ -129,6 +157,7 @@ public:
 	bool getSources(const string& name, vector<uint32_t>& sources);
 	uint32_t getSinkInputFromClient(const string& client_name);
 	bool getSinkInputsFromClient(const string& client_name, vector<uint32_t>& inputs);
+	bool getCard(const string& name, vector<uint32_t>& cards) const;
 	
 	/* volume */
 	
@@ -162,6 +191,8 @@ private:
 	
 	pa_dev_list m_sinks;
 	pa_dev_list m_sources;
+	
+	pa_card_list m_cards;
 	
 	pa_client_list m_clients;
 	pa_sink_input_list m_sink_inputs; /* these are the connected playback streams */
