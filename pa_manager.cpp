@@ -151,8 +151,8 @@ string PACardInfo::Info(bool with_profiles) const {
 		for(size_t i=0; i<profiles.size(); ++i) {
 			if((int)i == active_profile) ret << " * ";
 			else ret << "   ";
-			ret << profiles[i]->name << " (" << profiles[i]->description << 
-					")" << endl;
+			ret << i << ": " << profiles[i]->name << " (" 
+					<< profiles[i]->description << ")" << endl;
 		}
 	}
 	

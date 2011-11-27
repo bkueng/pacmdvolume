@@ -54,6 +54,7 @@ void CMain::parseCommandLine(int argc, char *argv[]) {
 	m_parameters->addParam("card-name", 'C');
 	
 	m_parameters->addTask("list", 'l');
+	m_parameters->addTask("list-cards", ' ');
 	m_parameters->addTask("list-sink", ' ');
 	m_parameters->addTask("list-source", ' ');
 	m_parameters->addTask("list-playback", ' ');
@@ -78,7 +79,8 @@ void CMain::printHelp() {
 		" "APP_NAME" [-v] [-i <idx> or -I <c>] -p <volume> [-n <channels>]\n"
 		" "APP_NAME" --version\n"
 		"\n"
-		"  -l, --list                      list all sinks, sources and playbacks\n"
+		"  -l, --list                      list all cards, sinks, sources and playbacks\n"
+		"      --list-cards                list cards\n"
 		"      --list-sink                 list sinks\n"
 		"      --list-source               list sources\n"
 		"      --list-playback             list playback\n"
@@ -175,24 +177,34 @@ void CMain::processArgs() {
 	vector<uint32_t> sink_card_indexes;
 	uint32_t source_card_idx=-1;
 	vector<uint32_t> source_card_indexes;
+	uint32_t card_idx=-1;
+	vector<uint32_t> card_indexes;
+	
 	
 	string card_val;
 	if(m_parameters->getParam("card", card_val)) {
-		int card_idx;
-		if(sscanf(card_val.c_str(), "%i", &card_idx)==1) {
-			if(m_pa_manager.Sink(card_idx)) {
-				sink_card_indexes.push_back(card_idx);
+		int t_card_idx;
+		if(sscanf(card_val.c_str(), "%i", &t_card_idx)==1) {
+			if(m_pa_manager.Sink(t_card_idx)) {
+				sink_card_indexes.push_back(t_card_idx);
 				sink_card_idx=0;
 			} else {
 				sink_card_idx=-2;
-				LOG(DEBUG, "sink with card idx %i not found", card_idx);
+				LOG(DEBUG, "sink with card idx %i not found", t_card_idx);
 			}
-			if(m_pa_manager.Source(card_idx)) {
-				source_card_indexes.push_back(card_idx);
+			if(m_pa_manager.Source(t_card_idx)) {
+				source_card_indexes.push_back(t_card_idx);
 				source_card_idx=0;
 			} else {
 				source_card_idx=-2;
-				LOG(DEBUG, "source with card idx %i not found", card_idx);
+				LOG(DEBUG, "source with card idx %i not found", t_card_idx);
+			}
+			if(m_pa_manager.Card(t_card_idx)) {
+				card_indexes.push_back(t_card_idx);
+				card_idx=0;
+			} else {
+				card_idx=-2;
+				LOG(DEBUG, "card idx %i not found", t_card_idx);
 			}
 		} else {
 			THROW_s(EINVALID_PARAMETER, "Failed to parse card idx %s", card_val.c_str());
@@ -210,6 +222,12 @@ void CMain::processArgs() {
 			source_card_idx=-2;
 			LOG(DEBUG, "source with name %s not found", card_val.c_str());
 		}
+		if(m_pa_manager.getCard(card_val, card_indexes)) {
+			card_idx=0;
+		} else {
+			card_idx=-2;
+			LOG(DEBUG, "card with name %s not found", card_val.c_str());
+		}
 	}
 	
 	
@@ -217,12 +235,17 @@ void CMain::processArgs() {
 	bool bPrint_sinks=false;
 	bool bPrint_sources=false;
 	bool bPrint_playbacks=false;
+	bool bPrint_cards=false;
 	int print_multiple=0;
 	
 	if(m_parameters->setTask("list")->bGiven) {
-		bPrint_sinks=bPrint_sources=bPrint_playbacks=true;
-		print_multiple=3;
+		bPrint_cards=bPrint_sinks=bPrint_sources=bPrint_playbacks=true;
+		print_multiple=4;
 	} else {
+		if(m_parameters->setTask("list-cards")->bGiven) {
+			bPrint_cards=true;
+			++print_multiple;
+		}
 		if(m_parameters->setTask("list-sink")->bGiven) {
 			bPrint_sinks=true;
 			++print_multiple;
@@ -234,6 +257,21 @@ void CMain::processArgs() {
 		if(m_parameters->setTask("list-playback")->bGiven) {
 			bPrint_playbacks=true;
 			++print_multiple;
+		}
+	}
+	
+	if(print_multiple>1 && bPrint_cards) cout << "cards:" << endl << endl;
+	if(bPrint_cards) {
+		if(card_idx==(uint32_t)-2) {
+			THROW_s(EINVALID_PARAMETER, "specified card not found");
+		} else if(card_idx==(uint32_t)-1) {
+			for(pa_card_list::const_iterator iter=m_pa_manager.Cards().begin(); 
+					iter!=m_pa_manager.Cards().end(); ++iter) {
+				cout << iter->second->Info() << endl << endl;
+			}
+		} else {
+			for(size_t i=0; i<card_indexes.size(); ++i)
+				cout << m_pa_manager.Card(card_indexes[i])->Info() << endl << endl;
 		}
 	}
 	
