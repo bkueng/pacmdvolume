@@ -261,7 +261,7 @@ void pa_sink_input_cb(pa_context * context, const pa_sink_input_info *i, int eol
 }
 
 //volume change callback
-void pa_volume_change_cb(pa_context* c, int success, void *userdata) {
+void pa_context_success_cb(pa_context* c, int success, void *userdata) {
 	
 	int* ready=(int*)userdata;
 	if(success==1) *ready=1;
@@ -511,6 +511,40 @@ PACardInfo* PAManager::Card(uint32_t card_idx) {
 	return(iter->second);
 }
 
+string PAManager::cardProfileName(PACardInfo* card, const string& profile) {
+	ASSERT_THROW(card, EINVALID_PARAMETER);
+	
+	int profile_idx;
+	if(isInteger(profile, &profile_idx)) {
+		ASSERT_THROW_e(profile_idx >= 0 && profile_idx < (int)card->profiles.size()
+				, EINVALID_PARAMETER, "profile index out of bound");
+		
+		return(card->profiles[profile_idx]->name);
+	} else {
+		for(size_t i=0; i<card->profiles.size(); ++i) {
+			if(toLower(card->profiles[i]->name).find(toLower(profile))
+					!=string::npos) return(card->profiles[i]->name);
+		}
+	}
+	THROW_s(EINVALID_PARAMETER, "profile %s not found", profile.c_str());
+}
+
+void PAManager::setCardProfile(PACardInfo* card, const string& profile_name) {
+	ASSERT_THROW(card, EINVALID_PARAMETER);
+	m_pa_ready=0;
+	pa_operation* op = pa_context_set_card_profile_by_index(m_pa_context
+			, card->index, profile_name.c_str(), pa_context_success_cb, &m_pa_ready);
+	
+	ASSERT_THROW_e(op, EGENERAL, "pa_context_set_card_profile_by_index failed");
+	
+    pa_operation_unref(op);
+    
+	while(m_pa_ready==0) {
+		//wait for the callback
+		pa_mainloop_iterate(m_pa_mainloop, 1, NULL);
+	}
+}
+
 
 uint32_t PAManager::getSink(const string& name) {
 	for(pa_dev_list::iterator iter=m_sinks.begin(); iter!=m_sinks.end(); ++iter) {
@@ -605,7 +639,8 @@ void PAManager::setSinkVolume(uint32_t idx, const pa_cvolume& volume) {
 	pa_operation* o;
 	m_pa_ready=0;
 	
-	if(!(o = pa_context_set_sink_volume_by_index(m_pa_context, idx, &volume, pa_volume_change_cb, &m_pa_ready))) {
+	if(!(o = pa_context_set_sink_volume_by_index(m_pa_context, idx, &volume
+			, pa_context_success_cb, &m_pa_ready))) {
 		LOG(ERROR, "pa_context_set_sink_volume_by_index() for index %i failed", idx);
 	} else {
 		pa_operation_unref(o);
@@ -623,7 +658,7 @@ void PAManager::setSinkMute(uint32_t idx, int mute) {
 	pa_operation* o;
 	m_pa_ready=0;
 	
-	if(!(o = pa_context_set_sink_mute_by_index(m_pa_context, idx, mute, pa_volume_change_cb, &m_pa_ready))) {
+	if(!(o = pa_context_set_sink_mute_by_index(m_pa_context, idx, mute, pa_context_success_cb, &m_pa_ready))) {
 		LOG(ERROR, "pa_context_set_sink_mute_by_index() for index %i failed", idx);
 	} else {
 		pa_operation_unref(o);
@@ -657,7 +692,7 @@ void PAManager::setSourceVolume(uint32_t idx, const pa_cvolume& volume) {
 	pa_operation* o;
 	m_pa_ready=0;
 	
-	if(!(o = pa_context_set_source_volume_by_index(m_pa_context, idx, &volume, pa_volume_change_cb, &m_pa_ready))) {
+	if(!(o = pa_context_set_source_volume_by_index(m_pa_context, idx, &volume, pa_context_success_cb, &m_pa_ready))) {
 		LOG(ERROR, "pa_context_set_source_volume_by_index() for index %i failed", idx);
 	} else {
 		pa_operation_unref(o);
@@ -674,7 +709,7 @@ void PAManager::setSourceMute(uint32_t idx, int mute) {
 	pa_operation* o;
 	m_pa_ready=0;
 	
-	if(!(o = pa_context_set_source_mute_by_index(m_pa_context, idx, mute, pa_volume_change_cb, &m_pa_ready))) {
+	if(!(o = pa_context_set_source_mute_by_index(m_pa_context, idx, mute, pa_context_success_cb, &m_pa_ready))) {
 		LOG(ERROR, "pa_context_set_source_mute_by_index() for index %i failed", idx);
 	} else {
 		pa_operation_unref(o);
@@ -707,7 +742,7 @@ void PAManager::setSinkInputVolume(uint32_t idx, const pa_cvolume& volume) {
 	pa_operation* o;
 	m_pa_ready=0;
 	
-	if(!(o = pa_context_set_sink_input_volume(m_pa_context, idx, &volume, pa_volume_change_cb, &m_pa_ready))) {
+	if(!(o = pa_context_set_sink_input_volume(m_pa_context, idx, &volume, pa_context_success_cb, &m_pa_ready))) {
 		LOG(ERROR, "pa_context_set_sink_input_volume() for index %i failed", idx);
 	} else {
 		pa_operation_unref(o);
@@ -724,7 +759,7 @@ void PAManager::setSinkInputMute(uint32_t idx, int mute) {
 	pa_operation* o;
 	m_pa_ready=0;
 	
-	if(!(o = pa_context_set_sink_input_mute(m_pa_context, idx, mute, pa_volume_change_cb, &m_pa_ready))) {
+	if(!(o = pa_context_set_sink_input_mute(m_pa_context, idx, mute, pa_context_success_cb, &m_pa_ready))) {
 		LOG(ERROR, "pa_context_set_sink_input_mute() for index %i failed", idx);
 	} else {
 		pa_operation_unref(o);

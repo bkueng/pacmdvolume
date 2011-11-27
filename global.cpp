@@ -105,4 +105,15 @@ string roundStr(float val, int digits) {
 	return(string(buffer2));
 }
 
+bool isInteger(const string& str, int* istr) {
+	size_t i=0;
+	if(str.length() > 0 && str[0]=='-') ++i;
+	for(; i<str.length(); ++i) 
+		if(str[i]<'0' || str[i]>'9') return(false);
+	
+	if(istr) sscanf(str.c_str(), "%i", istr);
+	
+	return(true);
+}
+
 

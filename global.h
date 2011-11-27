@@ -53,5 +53,6 @@ string& replace(string& str, const string& find, const string& replace);
 
 string roundStr(float val, int digits);
 
+bool isInteger(const string& str, int* istr); //converts str to int if str is numerical & returns true
 
 #endif /* GLOBAL_H_ */

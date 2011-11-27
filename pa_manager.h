@@ -147,6 +147,11 @@ public:
 	const pa_card_list& Cards() const { return(m_cards); }
 	PACardInfo* Card(uint32_t card_idx); /* returns NULL if not found */
 	
+		/* profile can either be the profile index or (substring of) 
+		 * profile name (first matching is returned) */
+	string cardProfileName(PACardInfo* card, const string& profile);
+	void setCardProfile(PACardInfo* card, const string& profile_name);
+	
 	
 	/* find a sink/source where name is a substring of the card name. the first found will be returned
 	 * , returns -1 if not found 

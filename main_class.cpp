@@ -59,6 +59,8 @@ void CMain::parseCommandLine(int argc, char *argv[]) {
 	m_parameters->addTask("list-source", ' ');
 	m_parameters->addTask("list-playback", ' ');
 	
+	m_parameters->addParam("set-profile", ' ');
+	
 	m_parameters->addParam("set-volume", 's');
 	m_parameters->addParam("channels", 'n');
 	
@@ -77,13 +79,17 @@ void CMain::printHelp() {
 		" "APP_NAME" [-v] [-c <c> or -C <c>] --list\n"
 		" "APP_NAME" [-v] [-c <c> or -C <c>] -s <volume> [-n <channels>]\n"
 		" "APP_NAME" [-v] [-i <idx> or -I <c>] -p <volume> [-n <channels>]\n"
+		" "APP_NAME" [-v] -c <c> or -C <c> --set-profile <profile>\n"
 		" "APP_NAME" --version\n"
 		"\n"
 		"  -l, --list                      list all cards, sinks, sources and playbacks\n"
-		"      --list-cards                list cards\n"
+		"      --list-cards                list cards with profiles\n"
 		"      --list-sink                 list sinks\n"
 		"      --list-source               list sources\n"
 		"      --list-playback             list playback\n"
+		"\n"
+		"      --set-profile <profile>     set active card profile\n"
+		"                                  profile is index or (substring of) the name\n"
 		"\n"
 		"  -s, --set-volume <volume>       set sink volume\n"
 		"                                  <volume> format:\n"
@@ -322,6 +328,21 @@ void CMain::processArgs() {
 		}
 	}
 	
+	/* set active profile */
+	string new_profile;
+	if(m_parameters->getParam("set-profile", new_profile)) {
+		ASSERT_THROW_e(card_idx!=(uint32_t)-2, EINVALID_PARAMETER, "specified card not found");
+		ASSERT_THROW_e(card_idx!=(uint32_t)-1, EINVALID_PARAMETER, "no card specified");
+		for(size_t i=0; i<card_indexes.size(); ++i) {
+			PACardInfo* card = m_pa_manager.Card(card_indexes[i]);
+			if(card) {
+				string profile_name = m_pa_manager.cardProfileName(card, new_profile);
+				m_pa_manager.setCardProfile(card, profile_name);
+			} else {
+				THROW_s(EINVALID_PARAMETER, "card with index %i not found", card_indexes[i]);
+			}
+		}
+	}
 	
 	/* parse channels */
 	vector<int> channels;
