@@ -334,7 +334,8 @@ void PAManager::InitPAInfo() {
 						pa_sinklist_cb,
 						&m_sinks
 				);
-	
+				ASSERT_THROW_e(pa_op, EGENERAL, "pa_context_get_sink_info_list failed");
+				
 				// Update state for next iteration through the loop
 				state++;
 				break;
@@ -352,6 +353,8 @@ void PAManager::InitPAInfo() {
 							pa_sourcelist_cb,
 							&m_sources
 					);
+					ASSERT_THROW_e(pa_op, EGENERAL, "pa_context_get_source_info_list failed");
+					
 					// Update the state so we know what to do next
 					state++;
 				}
@@ -362,6 +365,7 @@ void PAManager::InitPAInfo() {
 					
 					//get client info
 		            pa_op=pa_context_get_client_info_list(m_pa_context, pa_client_cb, &m_clients);
+		            ASSERT_THROW_e(pa_op, EGENERAL, "pa_context_get_client_info_list failed");
 		            
 		            ++state;
 				}
@@ -372,6 +376,7 @@ void PAManager::InitPAInfo() {
 					
 					//get the applications that use a sink
 		            pa_op = pa_context_get_sink_input_info_list(m_pa_context, pa_sink_input_cb, &m_sink_inputs);
+		            ASSERT_THROW_e(pa_op, EGENERAL, "pa_context_get_sink_input_info_list failed");
 		            
 		            ++state;
 				}
