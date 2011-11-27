@@ -42,8 +42,7 @@ string getTime(); //format: HH:MM:SS
 
 string toStr(int val);
 
-string& toLower(string& str); //convert str to lower and return it
-string toLower(const string& str);
+string toLower(const string& str); //convert str to lower and return it
 
 bool cmpInsensitive(const string& str1, const string& str2);
 

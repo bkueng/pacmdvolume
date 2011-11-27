@@ -62,13 +62,6 @@ bool cmpInsensitive(const string& str1, const string& str2) {
 }
 
 
-string& toLower(string& str) {
-	for(size_t i=0; i<str.length(); ++i) {
-		if(str[i]>='A' && str[i]<='Z') str[i]+=32;
-	}
-	return(str);
-}
-
 string toLower(const string& str) {
 	string ret=str;
 	for(size_t i=0; i<str.length(); ++i) {
