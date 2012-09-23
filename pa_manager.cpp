@@ -584,7 +584,8 @@ uint32_t PAManager::getSinkInputFromClient(const string& client_name) {
 	PAClientInfo* client;
 	for(pa_sink_input_list::iterator iter=m_sink_inputs.begin(); iter!=m_sink_inputs.end(); ++iter) {
 		if((client=iter->second->client_obj)) {
-			if(cmpInsensitive(client->name, client_name)) return(iter->first);
+			if(toLower(client->name).find(toLower(client_name))
+					!=string::npos) return(iter->first);
 		}
 	}
 	return((uint32_t)-1);
@@ -597,7 +598,8 @@ bool PAManager::getSinkInputsFromClient(const string& client_name, vector<uint32
 	PAClientInfo* client;
 	for(pa_sink_input_list::iterator iter=m_sink_inputs.begin(); iter!=m_sink_inputs.end(); ++iter) {
 		if((client=iter->second->client_obj)) {
-			if(cmpInsensitive(client->name, client_name)) inputs.push_back(iter->first);
+			if(toLower(client->name).find(toLower(client_name))
+					!=string::npos) inputs.push_back(iter->first);
 		}
 	}
 	

@@ -103,7 +103,7 @@ void CMain::printHelp() {
 		"  -p, --set-playback-volume <volume>\n"
 		"                                  set playback volume\n"
 		"     -i, --index <index>          playback index\n"
-		"     -I, --client-name <name>     playback client name\n"
+		"     -I, --client-name <name>     playback client name (or substring)\n"
 		"     -n, --channels <channels>    specify channels\n"
 		"                                  (comma-separated list with channel indexes)\n"
 		
