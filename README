@@ -1,19 +1,26 @@
-## by Beat Küng
+                                pacmdvolume
+                                ===========
 
-pacmdvolume is a command line tool to control the PulseAudio sound server. It shows sinks, sources, connected clients and controls their volume. It allows to change each channel's volume separately. This is useful especially for surround systems and the usage in scripts.
+             Copyright 2010-2013 Beat Küng <beat-kueng@gmx.net>
+
+
+pacmdvolume is a command line tool to control the PulseAudio sound server. It
+shows sinks, sources, connected clients and controls their volume. It allows to
+change each channel's volume separately. This is useful especially for surround
+systems and the usage in scripts.
 
 
 == compilation ==
 
 requirements: 
-	- pulseaudio (+ development files)
+	- pulseaudio (+ development files: debian/ubuntu package: libpulse-dev)
 
-just run:
+compile:
  $ make
-to compile and run
+print usage:
  $ ./pacmdvolume
-to print the usage
-
+install:
+ # make install
 
 
 == miscellaneous ==
