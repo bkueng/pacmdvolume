@@ -1,5 +1,5 @@
 ##
-# Copyright (C) 2010-2011 Beat Küng <beat-kueng@gmx.net>
+# Copyright (C) 2010-2013 Beat Küng <beat-kueng@gmx.net>
 # 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -35,10 +35,12 @@ LD := 				$(GXX)
 LIBS :=				-lm -lpulse
 INCPATH :=			
 
+INSTALL_DIR := /usr/local/bin
 
 
 
-.PHONY: all clean debug $(APP_NAME)
+
+.PHONY: all clean debug install uninstall
 all: $(APP_NAME)
 
 debug: $(APP_NAME)_dbg
@@ -65,6 +67,11 @@ $(APP_NAME): $(patsubst %.cpp, build/%.o, $(patsubst %.c, build_c/%.o, $(SOURCES
 $(APP_NAME)_dbg: $(patsubst %.cpp, build_dbg/%.o, $(patsubst %.c, build_c_dbg/%.o, $(SOURCES)))
 	$(LD) -o $@ $^ $(LIBS)
 
+install: $(APP_NAME)
+	cp $(APP_NAME) $(INSTALL_DIR)
+
+uninstall:
+	rm $(INSTALL_DIR)/$(APP_NAME)
 
 # Cleans the module.
 clean:
