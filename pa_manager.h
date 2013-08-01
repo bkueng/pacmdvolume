@@ -35,6 +35,9 @@ struct PADeviceInfo {
 	string Info() const;
 	string State() const;
 	
+	bool isRunning() { return dev_type==PADev_sink ? state_sink==PA_SINK_RUNNING
+	    : /* PADev_source */ state_source==PA_SOURCE_RUNNING; }
+	
     const string name;
     uint32_t index;
     const string description;
@@ -158,8 +161,10 @@ public:
 	 * for the ones with bool return: true on success (vector non empty), false if non found (vector empty)*/
 	uint32_t getSink(const string& name);
 	bool getSinks(const string& name, vector<uint32_t>& sinks);
+	bool getRunningSinks(vector<uint32_t>& sinks);
 	uint32_t getSource(const string& name);
 	bool getSources(const string& name, vector<uint32_t>& sources);
+	bool getRunningSources(vector<uint32_t>& sources);
 	uint32_t getSinkInputFromClient(const string& client_name);
 	bool getSinkInputsFromClient(const string& client_name, vector<uint32_t>& inputs);
 	bool getCard(const string& name, vector<uint32_t>& cards) const;

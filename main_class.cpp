@@ -52,6 +52,7 @@ void CMain::parseCommandLine(int argc, char *argv[]) {
 	
 	m_parameters->addParam("card", 'c');
 	m_parameters->addParam("card-name", 'C');
+	m_parameters->addSwitch("cards-running");
 	
 	m_parameters->addTask("list", 'l');
 	m_parameters->addTask("list-cards", ' ');
@@ -76,10 +77,10 @@ void CMain::parseCommandLine(int argc, char *argv[]) {
 
 void CMain::printHelp() {
 	printf("Usage:\n"
-		" "APP_NAME" [-v] [-c <c> or -C <c>] --list\n"
-		" "APP_NAME" [-v] [-c <c> or -C <c>] -s <volume> [-n <channels>]\n"
+		" "APP_NAME" [-v] [<card_selection>]   --list\n"
+		" "APP_NAME" [-v] [<card_selection>]   -s <volume> [-n <channels>]\n"
 		" "APP_NAME" [-v] [-i <idx> or -I <c>] -p <volume> [-n <channels>]\n"
-		" "APP_NAME" [-v] -c <c> or -C <c> --set-profile <profile>\n"
+		" "APP_NAME" [-v]  <card_selection>    --set-profile <profile>\n"
 		" "APP_NAME" --version\n"
 		"\n"
 		"  -l, --list                      list all cards, sinks, sources and playbacks\n"
@@ -108,9 +109,11 @@ void CMain::printHelp() {
 		"                                  (comma-separated list with channel indexes)\n"
 		
 		"\n"
-		"  -c, --card <idx>                specify card index\n"
-		"  -C, --card-name <name>          specify card name\n"
+		"  <card_selection>                select a card. one of the following:\n"
+		"     -c, --card <idx>             specify card index\n"
+		"     -C, --card-name <name>       specify card name\n"
 		"                                  (can also be a substring of the name)\n"
+		"         --cards-running          select all cards that are running (ie not idle)\n"
 		"\n"
 		"  -v, --verbose                   print debug messages\n"
 		"  -h, --help                      print this message\n"
@@ -235,6 +238,19 @@ void CMain::processArgs() {
 		} else {
 			card_idx=-2;
 			LOG(DEBUG, "card with name %s not found", card_val.c_str());
+		}
+	} else if(m_parameters->getSwitch("cards-running")) {
+		if(m_pa_manager.getRunningSinks(sink_card_indexes)) {
+			sink_card_idx = 0;
+		} else {
+			sink_card_idx = -2;
+			LOG(DEBUG, "no running sink found");
+		}
+		if(m_pa_manager.getRunningSources(source_card_indexes)) {
+			source_card_idx = 0;
+		} else {
+			source_card_idx = -2;
+			LOG(DEBUG, "no running source found");
 		}
 	}
 	

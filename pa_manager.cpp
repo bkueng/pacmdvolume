@@ -562,6 +562,15 @@ bool PAManager::getSinks(const string& name, vector<uint32_t>& sinks) {
 	
 	return(!sinks.empty());
 }
+bool PAManager::getRunningSinks(vector<uint32_t>& sinks) {
+	sinks.clear();
+	
+	for(pa_dev_list::iterator iter=m_sinks.begin(); iter!=m_sinks.end(); ++iter) {
+		if(iter->second->isRunning()) sinks.push_back(iter->first);
+	}
+	
+	return !sinks.empty();
+}
 
 uint32_t PAManager::getSource(const string& name) {
 	for(pa_dev_list::iterator iter=m_sources.begin(); iter!=m_sources.end(); ++iter) {
@@ -579,6 +588,16 @@ bool PAManager::getSources(const string& name, vector<uint32_t>& sources) {
 	
 	return(!sources.empty());
 }
+bool PAManager::getRunningSources(vector<uint32_t>& sources) {
+	sources.clear();
+	
+	for(pa_dev_list::iterator iter=m_sources.begin(); iter!=m_sources.end(); ++iter) {
+		if(iter->second->isRunning()) sources.push_back(iter->first);
+	}
+	
+	return !sources.empty();
+}
+
 
 uint32_t PAManager::getSinkInputFromClient(const string& client_name) {
 	PAClientInfo* client;
