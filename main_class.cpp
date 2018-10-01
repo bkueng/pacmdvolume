@@ -69,6 +69,7 @@ void CMain::parseCommandLine(int argc, char *argv[]) {
 	m_parameters->addParam("set-playback-volume", 'p');
 	m_parameters->addParam("index", 'i');
 	m_parameters->addParam("client-name", 'I');
+	m_parameters->addSwitch("non-corked");
 	
 	
 	m_cl_parse_result=m_parameters->parse();
@@ -104,9 +105,10 @@ void CMain::printHelp() {
 		"  -p, --set-playback-volume <volume>\n"
 		"                                  set playback volume\n"
 		"     -i, --index <index>          playback index\n"
-		"     -I, --client-name <name>     playback client name (or substring)\n"
+		"     -I, --client-name <name>     select playback client name (or substring)\n"
 		"     -n, --channels <channels>    specify channels\n"
 		"                                  (comma-separated list with channel indexes)\n"
+		"     --non-corked                 select non-corked (playing) streams\n"
 		
 		"\n"
 		"  <card_selection>                select a card. one of the following:\n"
@@ -406,6 +408,7 @@ void CMain::processArgs() {
 	vector<uint32_t> playback_indexes;
 	uint32_t playback_idx;
 	string s;
+	const bool non_corked = m_parameters->getSwitch("non-corked");
 	if(m_parameters->getParam("index", s)) {
 		if(sscanf(s.c_str(), "%i", &playback_idx)!=1) {
 			LOG(WARN, "failed to parse specified index %s", s.c_str());
@@ -413,8 +416,11 @@ void CMain::processArgs() {
 			playback_indexes.push_back(playback_idx);
 		}
 	} else if(m_parameters->getParam("client-name", s)) {
-		m_pa_manager.getSinkInputsFromClient(s, playback_indexes);
+		m_pa_manager.getSinkInputsFromClient(s, non_corked, playback_indexes);
 		ASSERT_THROW_e(playback_indexes.size()!=0, EINVALID_PARAMETER, "client name %s not found", s.c_str());
+	} else if (non_corked) {
+		m_pa_manager.getNonCorkedSinkInputs(playback_indexes);
+		ASSERT_THROW_e(playback_indexes.size()!=0, EINVALID_PARAMETER, "no non-corked clients found");
 	}
 	
 	if(m_parameters->getParam("set-playback-volume", vol_change)) {

@@ -88,7 +88,7 @@ PASinkInputInfo::PASinkInputInfo(const pa_sink_input_info& info)
 	: index(info.index), name(info.name ? info.name : ""), owner_module(info.owner_module)
 	, client(info.client), sink(info.sink), sample_spec(info.sample_spec), volume(info.volume)
 	, buffer_usec(info.buffer_usec), sink_usec(info.sink_usec), driver(info.driver ? info.driver : "")
-	, mute(info.mute)
+	, mute(info.mute), corked(info.corked)
 	, sink_obj(NULL), client_obj(NULL) {
 }
 
@@ -103,6 +103,7 @@ string PASinkInputInfo::Info() const {
 		ret << "sink: " << sink_obj->name << " (idx = " << sink_obj->index << ")\n";
 	}
 	ret << "mute: " << mute << "\n";
+	ret << "corked: " << corked << "\n";
 	
 	for(uint8_t i=0; i<volume.channels; ++i) {
 		ret << "channel " << (int)i << ": " << volume.values[i] << " (" 
@@ -611,19 +612,38 @@ uint32_t PAManager::getSinkInputFromClient(const string& client_name) {
 }
 
 
-bool PAManager::getSinkInputsFromClient(const string& client_name, vector<uint32_t>& inputs) {
+bool PAManager::getSinkInputsFromClient(const string& client_name, bool non_corked, vector<uint32_t>& inputs) {
 	inputs.clear();
 	
 	PAClientInfo* client;
 	for(pa_sink_input_list::iterator iter=m_sink_inputs.begin(); iter!=m_sink_inputs.end(); ++iter) {
 		if((client=iter->second->client_obj)) {
-			if(toLower(client->name).find(toLower(client_name))
-					!=string::npos) inputs.push_back(iter->first);
+			if (!non_corked || iter->second->corked == 0) {
+				if(toLower(client->name).find(toLower(client_name)) !=string::npos)
+					inputs.push_back(iter->first);
+			}
 		}
 	}
 	
 	return(!inputs.empty());
 }
+
+bool PAManager::getNonCorkedSinkInputs(vector<uint32_t>& inputs) {
+	inputs.clear();
+
+	PAClientInfo* client;
+	for(pa_sink_input_list::iterator iter=m_sink_inputs.begin(); iter!=m_sink_inputs.end(); ++iter) {
+		if((client=iter->second->client_obj)) {
+			if (iter->second->corked == 0) {
+				inputs.push_back(iter->first);
+			}
+		}
+	}
+
+	return(!inputs.empty());
+
+}
+
 
 bool PAManager::getCard(const string& name, vector<uint32_t>& cards) const {
 	

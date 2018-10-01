@@ -88,6 +88,7 @@ struct PASinkInputInfo {
 	pa_usec_t sink_usec;
 	const string driver;
 	int mute;
+	int corked; ///< 1 if stream is corked (equal to paused)
 	
 	PADeviceInfo* sink_obj;
 	PAClientInfo* client_obj;
@@ -166,7 +167,8 @@ public:
 	bool getSources(const string& name, vector<uint32_t>& sources);
 	bool getRunningSources(vector<uint32_t>& sources);
 	uint32_t getSinkInputFromClient(const string& client_name);
-	bool getSinkInputsFromClient(const string& client_name, vector<uint32_t>& inputs);
+	bool getSinkInputsFromClient(const string& client_name, bool non_corked, vector<uint32_t>& inputs);
+	bool getNonCorkedSinkInputs(vector<uint32_t>& inputs);
 	bool getCard(const string& name, vector<uint32_t>& cards) const;
 	
 	/* volume */
